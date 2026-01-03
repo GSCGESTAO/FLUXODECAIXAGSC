@@ -12,6 +12,7 @@ interface LayoutProps {
   syncError?: boolean;
   user: UserProfile;
   onLogout: () => void;
+  pendingCount?: number;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -22,7 +23,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onSync,
   syncError = false,
   user,
-  onLogout
+  onLogout,
+  pendingCount = 0
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,13 +53,19 @@ export const Layout: React.FC<LayoutProps> = ({
               <button 
                 onClick={(e) => { e.stopPropagation(); onSync(); }}
                 disabled={isSyncing}
-                className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
-                title={lastSync ? `Sincronizado: ${lastSync.toLocaleTimeString()}` : 'Sincronizar'}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group relative"
+                title={pendingCount > 0 ? `${pendingCount} itens pendentes de envio. Clique para sincronizar.` : (lastSync ? `Sincronizado: ${lastSync.toLocaleTimeString()}` : 'Sincronizar')}
               >
-                <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500' : lastSync ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                <svg className={`w-4 h-4 text-slate-400 group-hover:text-indigo-500 ${isSyncing ? 'animate-spin text-indigo-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
+                <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500' : (pendingCount > 0 ? 'bg-amber-500 animate-pulse' : (lastSync ? 'bg-emerald-500' : 'bg-slate-300'))}`}></div>
+                
+                <div className="flex items-center gap-1.5">
+                  <svg className={`w-4 h-4 text-slate-400 group-hover:text-indigo-500 ${isSyncing ? 'animate-spin text-indigo-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 hidden sm:inline uppercase tracking-tighter">
+                    {isSyncing ? 'Sincronizando...' : (pendingCount > 0 ? `${pendingCount} Pendentes` : 'Atualizado')}
+                  </span>
+                </div>
               </button>
             )}
           </div>

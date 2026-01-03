@@ -39,6 +39,7 @@ export interface Transaction {
   observations?: string;
   status: TransactionStatus;
   user: string;
+  isSynced?: boolean; // Novo campo para controle de sincronização
 }
 
 export interface AnomalyCheckResult {

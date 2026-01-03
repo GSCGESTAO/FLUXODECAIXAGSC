@@ -23,11 +23,22 @@ const App: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
-  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('gsc_pending_transactions');
+    const pending = saved ? JSON.parse(saved) : [];
+    return [...pending, ...MOCK_TRANSACTIONS];
+  });
+  
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
+
+  // Salva transações não sincronizadas no localStorage para persistência offline
+  useEffect(() => {
+    const pending = transactions.filter(t => t.isSynced === false);
+    localStorage.setItem('gsc_pending_transactions', JSON.stringify(pending));
+  }, [transactions]);
 
   const syncData = useCallback(async () => {
     if (!SHEET_API_URL) {
@@ -39,10 +50,41 @@ const App: React.FC = () => {
     setSyncError(false);
     
     try {
+      // 1. FORÇAR ENVIO (PUSH)
+      // Tenta enviar transações que ainda não foram sincronizadas
+      const pendingTransactions = transactions.filter(t => t.isSynced === false);
+      if (pendingTransactions.length > 0) {
+        console.log(`Sincronizando ${pendingTransactions.length} transações pendentes...`);
+        for (const t of pendingTransactions) {
+          try {
+            const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
+            if (success) {
+              setTransactions(prev => prev.map(item => item.id === t.id ? { ...item, isSynced: true } : item));
+            }
+          } catch (e) {
+            console.error(`Falha ao enviar transação ${t.id}:`, e);
+          }
+        }
+      }
+
+      // 2. RECEBER DADOS (PULL)
       const data = await fetchSheetData(SHEET_API_URL);
       if (data) {
         setEstablishments(data.establishments);
-        setTransactions(data.transactions);
+        
+        // Combina transações da planilha com as locais que ainda não foram sincronizadas
+        const remoteTransactions = data.transactions.map(t => ({ ...t, isSynced: true }));
+        const localPending = transactions.filter(t => t.isSynced === false);
+        
+        // Remove duplicatas (caso uma transação tenha acabado de ser sincronizada e já esteja no remote)
+        const combined = [...localPending];
+        remoteTransactions.forEach(rt => {
+           if (!combined.some(ct => ct.id === rt.id)) {
+             combined.push(rt);
+           }
+        });
+
+        setTransactions(combined);
         setAuthorizedUsers(data.authorizedUsers);
         setLastSync(new Date());
         
@@ -59,14 +101,13 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Erro no sync:", err);
       setSyncError(true);
-      // FAIL-SAFE: Se for a primeira carga e deu erro, libera com mocks para não travar o app
       if (lastSync === null) {
         setIsAuthorized(true);
       }
     } finally {
       setIsSyncing(false);
     }
-  }, [user, lastSync]);
+  }, [user, transactions, lastSync]);
 
   useEffect(() => {
     syncData();
@@ -92,17 +133,19 @@ const App: React.FC = () => {
   };
 
   const handleSaveTransaction = async (transaction: Transaction) => {
-    const enriched = { ...transaction, user: user?.email || 'unknown' };
+    const enriched = { ...transaction, user: user?.email || 'unknown', isSynced: false };
     setTransactions(prev => [enriched, ...prev]);
     
     if (SHEET_API_URL) {
-      await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', enriched);
+      const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', enriched);
+      if (success) {
+        setTransactions(prev => prev.map(t => t.id === enriched.id ? { ...t, isSynced: true } : t));
+      }
     }
   };
 
   const handleUpdateTransaction = (updatedTransaction: Transaction) => {
     setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
-    // Futuro: Implementar UPDATE_TRANSACTION no backend
   };
 
   const handleAddEstablishment = async (establishment: Establishment) => {
@@ -142,6 +185,7 @@ const App: React.FC = () => {
         syncError={syncError}
         user={user}
         onLogout={handleLogout}
+        pendingCount={transactions.filter(t => !t.isSynced).length}
       >
         <Routes>
           <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} />} />
