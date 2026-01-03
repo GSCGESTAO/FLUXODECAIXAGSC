@@ -7,10 +7,10 @@ import { Transaction, Establishment, AuthorizedUser } from "../types";
 export const fetchSheetData = async (url: string): Promise<{ 
   establishments: Establishment[], 
   transactions: Transaction[],
-  authorizedUsers: AuthorizedUser[]
+  authorizedUsers: AuthorizedUser[],
+  notes?: string
 } | null> => {
   try {
-    // Adicionamos um timestamp para evitar cache do navegador
     const response = await fetch(`${url}?t=${Date.now()}`);
     if (!response.ok) throw new Error("Falha ao conectar com a planilha");
     
@@ -20,6 +20,7 @@ export const fetchSheetData = async (url: string): Promise<{
       return {
         establishments: data.establishments,
         authorizedUsers: data.authorizedUsers || [],
+        notes: data.notes || '',
         transactions: (data.transactions || []).map((t: any) => ({
           ...t,
           amount: parseFloat(t.amount) || 0,
@@ -35,7 +36,6 @@ export const fetchSheetData = async (url: string): Promise<{
 
 /**
  * Função genérica para enviar dados para a planilha.
- * O Google Apps Script exige modo 'no-cors' para evitar preflight OPTIONS que ele não suporta bem.
  */
 export const postToSheet = async (url: string, action: string, payload: any): Promise<boolean> => {
   try {
@@ -44,8 +44,6 @@ export const postToSheet = async (url: string, action: string, payload: any): Pr
       ...payload
     });
 
-    // Usamos fetch com no-cors. Nota: não conseguiremos ler a resposta JSON do Google 
-    // devido à política de segurança, mas a gravação ocorrerá no servidor.
     await fetch(url, {
       method: 'POST',
       mode: 'no-cors',

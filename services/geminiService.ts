@@ -17,7 +17,8 @@ export interface AiAssistantResponse {
 }
 
 /**
- * Sugere descrições baseadas no estabelecimento e tipo de transação.
+ * Suggests descriptions based on establishment and transaction type.
+ * Uses gemini-3-flash-preview for basic text tasks.
  */
 export const getSmartSuggestions = async (
   establishmentName: string,
@@ -25,7 +26,6 @@ export const getSmartSuggestions = async (
   currentInput: string
 ): Promise<string[]> => {
   try {
-    // Always use process.env.API_KEY to initialize GoogleGenAI.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
@@ -35,13 +35,14 @@ export const getSmartSuggestions = async (
       
       Sugira 5 descrições curtas e comuns para este tipo de transação em um restaurante ou hotel.
       Retorne APENAS um array JSON de strings.
+      Exemplo: ["Pagamento Fornecedor", "Compra Bebidas", "Manutenção", "Vale Transporte", "Enxoval"]
     `;
 
+    // Fix: Using gemini-3-flash-preview for simple text tasks like description suggestions
     const response = await ai.models.generateContent({
       model: FLASH_MODEL,
       contents: prompt,
       config: {
-        // Removed invalid 'bottomK' property.
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -60,7 +61,8 @@ export const getSmartSuggestions = async (
 };
 
 /**
- * Verifica anomalias na transação.
+ * Checks for anomalies in the transaction.
+ * Uses gemini-3-pro-preview for complex reasoning tasks.
  */
 export const checkAnomaly = async (
   establishmentName: string,
@@ -69,17 +71,20 @@ export const checkAnomaly = async (
   description: string
 ): Promise<{ isAnomalous: boolean; reason: string }> => {
   try {
-    // Always use process.env.API_KEY to initialize GoogleGenAI.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const prompt = `
-      Analise a seguinte transação financeira de um restaurante/hotel para detectar anomalias.
+      Analise a seguinte transação financeira de um estabelecimento (restaurante ou hotel) para detectar anomalias ou erros de digitação.
       Estabelecimento: ${establishmentName}
       Tipo: ${type}
       Descrição: ${description}
       Valor: R$ ${amount}
+
+      É normal um valor desse montante para essa descrição neste contexto? 
+      Se o valor for muito alto ou muito baixo para o contexto, marque como anômalo.
     `;
 
+    // Fix: Using gemini-3-pro-preview for advanced reasoning (anomaly detection)
     const response = await ai.models.generateContent({
       model: PRO_MODEL,
       contents: prompt,
@@ -110,7 +115,8 @@ export const checkAnomaly = async (
 };
 
 /**
- * Responde perguntas e sugere lançamentos financeiros.
+ * Answers questions and potentially suggests transaction logging.
+ * Uses gemini-3-pro-preview for complex data extraction and reasoning.
  */
 export const askFinancialAssistant = async (
   establishmentName: string,
@@ -119,9 +125,8 @@ export const askFinancialAssistant = async (
   question: string
 ): Promise<AiAssistantResponse> => {
   try {
-    // Always use process.env.API_KEY to initialize GoogleGenAI.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const recentTransactions = transactions.slice(0, 50);
+    const recentTransactions = transactions.slice(0, 100);
     
     const contextData = {
       establishments: establishments.map(e => ({ id: e.id, name: e.name })),
@@ -139,13 +144,27 @@ export const askFinancialAssistant = async (
       Contexto: ${establishmentName === "Toda a Rede" ? "Toda a rede" : `Estabelecimento ${establishmentName}`}.
       
       Dados: ${JSON.stringify(contextData)}
+
       USUÁRIO DISSE: "${question}"
 
       TAREFAS:
       1. Responda à pergunta do usuário de forma útil e direta.
-      2. Se o usuário quiser REGISTRAR algo, extraia os dados.
+      2. Se o usuário estiver expressando o desejo de LANÇAR ou REGISTRAR uma nova transação (ex: "Lançar gasto de 50 reais com limpeza"), extraia os dados.
+      
+      Regras para extração:
+      - amount: apenas número.
+      - type: "Entrada" ou "Saída".
+      - description: descrição curta.
+      - establishmentId: tente encontrar o ID do estabelecimento se o usuário mencionou um nome da lista fornecida.
+
+      Retorne um JSON com:
+      {
+        "answer": "Sua resposta em texto aqui",
+        "suggestedTransaction": { "type": "Saída", "amount": 50, "description": "Limpeza", "establishmentId": "id_aqui" } // (opcional)
+      }
     `;
 
+    // Fix: Using gemini-3-pro-preview for complex multi-task extraction and financial reasoning
     const response = await ai.models.generateContent({
       model: PRO_MODEL,
       contents: prompt,

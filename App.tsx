@@ -23,13 +23,24 @@ const App: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [generalNotes, setGeneralNotes] = useState<string>(localStorage.getItem('gsc_general_notes') || '');
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('gsc_pending_transactions');
+    const pending = saved ? JSON.parse(saved) : [];
+    // Only return mock data if there's no sheet URL and no pending
+    return !SHEET_API_URL && pending.length === 0 ? MOCK_TRANSACTIONS : pending;
+  });
+  const [notes, setNotes] = useState<string>(localStorage.getItem('gsc_notes') || '');
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
+
+  // Salva transações não sincronizadas no localStorage para persistência offline
+  useEffect(() => {
+    const pending = transactions.filter(t => t.isSynced === false);
+    localStorage.setItem('gsc_pending_transactions', JSON.stringify(pending));
+  }, [transactions]);
 
   const syncData = useCallback(async () => {
     if (!SHEET_API_URL) {
@@ -41,22 +52,42 @@ const App: React.FC = () => {
     setSyncError(false);
     
     try {
-      // 1. PUSH PENDING DATA
+      // 1. FORÇAR ENVIO (PUSH)
       const pendingTransactions = transactions.filter(t => t.isSynced === false);
-      for (const t of pendingTransactions) {
-        await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
+      if (pendingTransactions.length > 0) {
+        for (const t of pendingTransactions) {
+          try {
+            const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
+            if (success) {
+              setTransactions(prev => prev.map(item => item.id === t.id ? { ...item, isSynced: true } : item));
+            }
+          } catch (e) {
+            console.error(`Falha ao enviar transação ${t.id}:`, e);
+          }
+        }
       }
 
-      // 2. FETCH LATEST DATA
+      // 2. RECEBER DADOS (PULL)
       const data = await fetchSheetData(SHEET_API_URL);
       if (data) {
         setEstablishments(data.establishments);
-        setTransactions(data.transactions.map(t => ({ ...t, isSynced: true })));
+        if (data.notes !== undefined) {
+          setNotes(data.notes);
+          localStorage.setItem('gsc_notes', data.notes);
+        }
+        
+        const remoteTransactions = data.transactions.map(t => ({ ...t, isSynced: true }));
+        const localPending = transactions.filter(t => t.isSynced === false);
+        
+        const combined = [...localPending];
+        remoteTransactions.forEach(rt => {
+           if (!combined.some(ct => ct.id === rt.id)) {
+             combined.push(rt);
+           }
+        });
+
+        setTransactions(combined);
         setAuthorizedUsers(data.authorizedUsers);
-        
-        // Se houver uma nota vinda do servidor, poderíamos carregar aqui
-        // Por ora, mantemos local e apenas enviamos ao salvar
-        
         setLastSync(new Date());
         
         if (user) {
@@ -112,10 +143,8 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = async (updatedTransaction: Transaction) => {
-    // Atualiza localmente
     setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...updatedTransaction, isSynced: false } : t));
     
-    // Envia para a planilha
     if (SHEET_API_URL) {
       const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', updatedTransaction);
       if (success) {
@@ -124,11 +153,11 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveNote = async (note: string) => {
-    setGeneralNotes(note);
-    localStorage.setItem('gsc_general_notes', note);
+  const handleSaveNote = async (newNote: string) => {
+    setNotes(newNote);
+    localStorage.setItem('gsc_notes', newNote);
     if (SHEET_API_URL) {
-      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { note, user: user?.email });
+      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { notes: newNote });
     }
   };
 
@@ -171,7 +200,7 @@ const App: React.FC = () => {
         pendingCount={transactions.filter(t => !t.isSynced).length}
       >
         <Routes>
-          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={generalNotes} onSaveNote={handleSaveNote} />} />
+          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} />} />
           <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} />} />
           <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
           <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />

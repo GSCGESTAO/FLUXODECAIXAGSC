@@ -9,53 +9,103 @@ import { askFinancialAssistant, AiAssistantResponse } from '../services/geminiSe
 interface DashboardProps {
   establishments: Establishment[];
   transactions: Transaction[];
-  notes: string;
-  onSaveNote: (note: string) => void;
+  notes?: string;
+  onSaveNote?: (note: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactions, notes, onSaveNote }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactions, notes = '', onSaveNote }) => {
   const navigate = useNavigate();
   
   // States for dynamic filtering
   const [leftFilterIds, setLeftFilterIds] = useState<string[]>([]);
   const [rightFilterIds, setRightFilterIds] = useState<string[]>([]);
-  const [activeDropdown, setActiveDropdown] = useState<'left' | 'right' | null>(null);
   
-  // Notes State
-  const [localNote, setLocalNote] = useState(notes);
-  const [isNoteEditing, setIsNoteEditing] = useState(false);
+  // Dropdown States
+  const [activeDropdown, setActiveDropdown] = useState<'left' | 'right' | null>(null);
 
-  useEffect(() => setLocalNote(notes), [notes]);
+  // Notes state
+  const [localNote, setLocalNote] = useState(notes);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+
+  useEffect(() => {
+    setLocalNote(notes);
+  }, [notes]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.dropdown-container')) setActiveDropdown(null);
+      if (!target.closest('.dropdown-container')) {
+        setActiveDropdown(null);
+      }
     };
-    if (activeDropdown) document.addEventListener('click', handleClickOutside);
+    if (activeDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
     return () => document.removeEventListener('click', handleClickOutside);
   }, [activeDropdown]);
+
+  // Sincroniza os filtros quando os estabelecimentos mudam
+  useEffect(() => {
+    if (establishments.length > 0) {
+      const validLeftIds = leftFilterIds.filter(id => establishments.some(e => e.id === id));
+      const validRightIds = rightFilterIds.filter(id => establishments.some(e => e.id === id));
+
+      if (validLeftIds.length === 0 && validRightIds.length === 0) {
+        setLeftFilterIds(establishments.map(e => e.id));
+      } else {
+        setLeftFilterIds(validLeftIds);
+        setRightFilterIds(validRightIds);
+      }
+    }
+  }, [establishments]);
 
   // AI Query State
   const [question, setQuestion] = useState('');
   const [aiResponse, setAiResponse] = useState<AiAssistantResponse | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
-  const leftBalance = useMemo(() => {
-    return transactions
-      .filter(t => leftFilterIds.includes(String(t.establishmentId)))
-      .reduce((acc, t) => t.type === TransactionType.ENTRADA ? acc + t.amount : acc - t.amount, 0);
-  }, [transactions, leftFilterIds]);
+  const toggleId = (id: string, currentIds: string[], setIds: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(eid => eid !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
 
-  const rightBalance = useMemo(() => {
+  const selectAll = (setIds: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setIds(establishments.map(e => e.id));
+  };
+  
+  const clearAll = (setIds: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setIds([]);
+  };
+
+  const calculateGroupBalance = (filterIds: string[]) => {
+    if (filterIds.length === 0) return 0;
+    
     return transactions
-      .filter(t => rightFilterIds.includes(String(t.establishmentId)))
-      .reduce((acc, t) => t.type === TransactionType.ENTRADA ? acc + t.amount : acc - t.amount, 0);
-  }, [transactions, rightFilterIds]);
+      .filter(t => filterIds.includes(String(t.establishmentId)))
+      .reduce((acc, t) => {
+        const typeNormalized = String(t.type).trim().toLowerCase();
+        const amount = Number(t.amount) || 0;
+        
+        if (typeNormalized === 'entrada') {
+          return acc + amount;
+        } else if (typeNormalized === 'saída' || typeNormalized === 'saida') {
+          return acc - amount;
+        }
+        return acc;
+      }, 0);
+  };
+
+  const leftBalance = useMemo(() => calculateGroupBalance(leftFilterIds), [transactions, leftFilterIds]);
+  const rightBalance = useMemo(() => calculateGroupBalance(rightFilterIds), [transactions, rightFilterIds]);
 
   const chartData = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       const y = d.getFullYear();
@@ -64,40 +114,118 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
       return `${y}-${m}-${day}`;
     });
 
-    return days.map(date => {
+    return last7Days.map(date => {
       const dayTransactions = transactions.filter(t => t.date === date);
+      const entrada = dayTransactions
+        .filter(t => String(t.type).trim().toLowerCase() === 'entrada')
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const saida = dayTransactions
+        .filter(t => {
+           const type = String(t.type).trim().toLowerCase();
+           return type === 'saída' || type === 'saida';
+        })
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      
+      const labelDate = new Date(date + 'T12:00:00');
       return {
-        name: new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        Entrada: dayTransactions.filter(t => t.type === TransactionType.ENTRADA).reduce((s, t) => s + t.amount, 0),
-        Saída: dayTransactions.filter(t => t.type === TransactionType.SAIDA).reduce((s, t) => s + t.amount, 0)
+        name: labelDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        Entrada: entrada,
+        Saída: saida
       };
     });
   }, [transactions]);
 
-  const renderDropdownFilter = (currentIds: string[], setIds: React.Dispatch<React.SetStateAction<string[]>>, key: 'left' | 'right') => {
-    const isOpen = activeDropdown === key;
-    const label = currentIds.length === 0 ? 'Nenhum' : currentIds.length === establishments.length ? 'Todos' : `${currentIds.length} Selecionados`;
+  const getEstablishmentBalance = (id: string) => {
+    return transactions
+      .filter(t => String(t.establishmentId) === id)
+      .reduce((acc, t) => {
+        const type = String(t.type).trim().toLowerCase();
+        const val = Number(t.amount) || 0;
+        return (type === 'entrada') ? acc + val : acc - val;
+      }, 0);
+  };
+
+  const handleAskAI = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim()) return;
+
+    setLoadingAi(true);
+    setAiResponse(null);
+    
+    const result = await askFinancialAssistant("Toda a Rede", transactions, establishments, question);
+    
+    setAiResponse(result);
+    setLoadingAi(false);
+  };
+
+  const openSuggestedTransaction = (sug: NonNullable<AiAssistantResponse['suggestedTransaction']>) => {
+    const params = new URLSearchParams();
+    if (sug.amount) params.set('amount', sug.amount.toString());
+    if (sug.description) params.set('description', sug.description);
+    if (sug.type) params.set('type', sug.type);
+    if (sug.establishmentId) params.set('establishmentId', sug.establishmentId);
+    
+    navigate(`/new?${params.toString()}`);
+  };
+
+  const saveNote = () => {
+    if (onSaveNote) onSaveNote(localNote);
+    setIsEditingNote(false);
+  };
+
+  const renderDropdownFilter = (
+    currentIds: string[], 
+    setIds: React.Dispatch<React.SetStateAction<string[]>>, 
+    dropdownKey: 'left' | 'right'
+  ) => {
+    const isOpen = activeDropdown === dropdownKey;
+    
+    let labelText = 'Selecione...';
+    if (currentIds.length === 0) labelText = 'Nenhum selecionado';
+    else if (currentIds.length === establishments.length) labelText = 'Todos os Estabelecimentos';
+    else if (currentIds.length === 1) labelText = establishments.find(e => e.id === currentIds[0])?.name || '1 Selecionado';
+    else labelText = `${currentIds.length} selecionados`;
 
     return (
-      <div className="relative mb-3 dropdown-container">
-         <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">{key === 'left' ? 'Grupo A' : 'Grupo B'}</label>
+      <div className="relative mb-3 dropdown-container" onClick={(e) => e.stopPropagation()}>
+         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">
+            {dropdownKey === 'left' ? 'Comparação A' : 'Comparação B'}
+         </label>
          <button
-            onClick={() => setActiveDropdown(isOpen ? null : key)}
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-200"
+            onClick={() => setActiveDropdown(isOpen ? null : dropdownKey)}
+            className={`w-full bg-white dark:bg-slate-800 border rounded-xl p-3 flex items-center justify-between shadow-sm transition-all ${isOpen ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
          >
-            <span className="truncate">{label}</span>
-            <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate pr-2">{labelText}</span>
+            <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
          </button>
 
          {isOpen && (
-             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 z-[100] max-h-60 overflow-y-auto animate-fade-in">
-                <div onClick={() => setIds(currentIds.length === establishments.length ? [] : establishments.map(e => e.id))} className="p-3 border-b dark:border-slate-700 font-bold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 uppercase">Selecionar Todos</div>
-                {establishments.map(est => (
-                  <div key={est.id} onClick={() => setIds(prev => prev.includes(est.id) ? prev.filter(i => i !== est.id) : [...prev, est.id])} className="p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 border-b last:border-0 dark:border-slate-700">
-                    <div className={`w-4 h-4 rounded border ${currentIds.includes(est.id) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`} />
-                    <span className="text-sm">{est.name}</span>
-                  </div>
-                ))}
+             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 z-[100] max-h-72 overflow-y-auto animate-fade-in scrollbar-thin">
+                <div 
+                    onClick={() => currentIds.length === establishments.length ? clearAll(setIds) : selectAll(setIds)}
+                    className="p-3 border-b border-slate-100 dark:border-slate-700 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors sticky top-0 bg-white dark:bg-slate-800 z-10"
+                >
+                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${currentIds.length === establishments.length ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                        {currentIds.length === establishments.length && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                     </div>
+                     <span className="text-sm font-bold text-slate-800 dark:text-white">Selecionar Todos</span>
+                </div>
+                
+                {establishments.map(est => {
+                    const isSelected = currentIds.includes(est.id);
+                    return (
+                        <div 
+                            key={est.id}
+                            onClick={() => toggleId(est.id, currentIds, setIds)}
+                            className="p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors border-b border-slate-50 dark:border-slate-700/30 last:border-0"
+                        >
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                                {isSelected && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                            </div>
+                            <span className="text-sm text-slate-600 dark:text-slate-300 truncate">{est.name}</span>
+                        </div>
+                    );
+                })}
              </div>
          )}
       </div>
@@ -106,88 +234,206 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
 
   return (
     <div className="space-y-6">
-      {/* Comparativo de Saldos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="relative z-[60]">
+        <div className="flex flex-col relative z-[60]">
           {renderDropdownFilter(leftFilterIds, setLeftFilterIds, 'left')}
-          <div className="bg-indigo-600 dark:bg-indigo-900 rounded-2xl p-6 text-white shadow-lg h-32 flex flex-col justify-center">
-            <div className="text-3xl font-bold">{CURRENCY_FORMATTER.format(leftBalance)}</div>
-            <div className="text-[10px] uppercase font-bold opacity-70 mt-1">Saldo Consolidado A</div>
+          <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 dark:from-indigo-900 dark:to-slate-900 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 flex-1 relative">
+             <div className="relative z-10">
+                <h2 className="text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-white"></div>
+                   Grupo A ({leftFilterIds.length})
+                </h2>
+                <div className="text-3xl font-bold mt-2">{CURRENCY_FORMATTER.format(leftBalance)}</div>
+             </div>
+             <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white opacity-10 rounded-full blur-2xl pointer-events-none"></div>
           </div>
         </div>
-        <div className="relative z-[50]">
+
+        <div className="flex flex-col relative z-[50]">
           {renderDropdownFilter(rightFilterIds, setRightFilterIds, 'right')}
-          <div className="bg-amber-500 dark:bg-amber-900 rounded-2xl p-6 text-white shadow-lg h-32 flex flex-col justify-center">
-            <div className="text-3xl font-bold">{CURRENCY_FORMATTER.format(rightBalance)}</div>
-            <div className="text-[10px] uppercase font-bold opacity-70 mt-1">Saldo Consolidado B</div>
+          <div className="bg-gradient-to-r from-orange-500 to-amber-600 dark:from-orange-900 dark:to-amber-900 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 flex-1 relative">
+             <div className="relative z-10">
+                <h2 className="text-orange-100 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-white"></div>
+                   Grupo B ({rightFilterIds.length})
+                </h2>
+                <div className="text-3xl font-bold mt-2">{CURRENCY_FORMATTER.format(rightBalance)}</div>
+             </div>
+             <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white opacity-10 rounded-full blur-2xl pointer-events-none"></div>
           </div>
         </div>
-      </div>
-
-      {/* Assistente IA */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm relative transition-all">
-        <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl"><svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg></div>
-            <h3 className="font-bold text-slate-800 dark:text-white">Assistente de IA</h3>
-        </div>
-        
-        <form onSubmit={async (e) => { e.preventDefault(); setLoadingAi(true); setAiResponse(await askFinancialAssistant("Rede", transactions, establishments, question)); setLoadingAi(false); }} className="relative bg-slate-100 dark:bg-slate-900/50 rounded-2xl p-1.5 flex items-center group focus-within:ring-2 ring-indigo-500/20">
-            <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder='Lançar 50 reais de manutenção...' className="flex-1 bg-transparent p-3 outline-none text-sm dark:text-white placeholder:text-slate-400" />
-            <button disabled={loadingAi || !question.trim()} className="bg-[#3b3f9a] dark:bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md active:scale-95 disabled:opacity-50 transition-all">
-                {loadingAi ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Analisar'}
-            </button>
-        </form>
-
-        {aiResponse && (
-          <div className="mt-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-sm animate-fade-in border border-indigo-100 dark:border-indigo-800">
-            {aiResponse.answer}
-          </div>
-        )}
       </div>
 
       {/* Mural de Anotações */}
-      <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-6 border border-amber-100 dark:border-amber-900/20 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg> Mural de Recados</h3>
-            {isNoteEditing ? (
-                <button onClick={() => { onSaveNote(localNote); setIsNoteEditing(false); }} className="text-xs font-bold bg-amber-600 text-white px-3 py-1 rounded-lg">Salvar</button>
+      <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-5 border border-amber-200 dark:border-amber-900/20 shadow-sm relative transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
+                    <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </div>
+                <h3 className="font-bold text-amber-900 dark:text-amber-100 tracking-tight">Mural de Anotações</h3>
+            </div>
+            {!isEditingNote ? (
+              <button 
+                onClick={() => setIsEditingNote(true)} 
+                className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest hover:underline"
+              >
+                Editar
+              </button>
             ) : (
-                <button onClick={() => setIsNoteEditing(true)} className="text-xs font-bold text-amber-700 dark:text-amber-400">Editar</button>
+              <button 
+                onClick={saveNote} 
+                className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:underline"
+              >
+                Salvar
+              </button>
             )}
-        </div>
-        {isNoteEditing ? (
-            <textarea value={localNote} onChange={e => setLocalNote(e.target.value)} className="w-full h-24 bg-white dark:bg-slate-800 p-3 rounded-xl border border-amber-200 outline-none text-sm" placeholder="Escreva lembretes aqui..." />
-        ) : (
-            <p className="text-sm text-amber-800 dark:text-amber-300 italic whitespace-pre-wrap">{localNote || "Sem anotações no momento."}</p>
-        )}
+          </div>
+          
+          {isEditingNote ? (
+            <textarea 
+              value={localNote} 
+              onChange={(e) => setLocalNote(e.target.value)}
+              placeholder="Digite lembretes, avisos ou metas para a rede..."
+              className="w-full h-24 p-3 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-300 transition-all"
+            />
+          ) : (
+            <div className="text-sm text-amber-800 dark:text-amber-200 min-h-[40px] italic">
+              {localNote || "Sem anotações no momento. Clique em editar para adicionar."}
+            </div>
+          )}
       </div>
 
-      {/* Gráfico de Tendência */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h3 className="text-slate-700 dark:text-slate-300 font-bold mb-4">Fluxo Consolidado (7 Dias)</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm relative transition-colors">
+        <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl">
+                    <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 tracking-tight">Assistente Financeiro IA</h3>
+            </div>
+            
+            <form onSubmit={handleAskAI} className="relative group">
+                <input 
+                    type="text" 
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder='Ex: "Lançar 50 reais de limpeza para Villa Montese"'
+                    className="w-full p-4 pr-32 rounded-2xl border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 shadow-sm transition-all"
+                />
+                <button 
+                    type="submit"
+                    disabled={loadingAi || !question.trim()}
+                    className="absolute right-2 top-2 bottom-2 bg-[#3f45a1] dark:bg-[#4f55c1] text-white px-5 rounded-xl text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center min-w-[90px]"
+                >
+                    {loadingAi ? (
+                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : 'Analisar'}
+                </button>
+            </form>
+
+            {aiResponse && (
+              <div className="mt-5 space-y-3 animate-fade-in">
+                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-800/30 text-slate-800 dark:text-slate-200 text-sm leading-relaxed shadow-sm">
+                  <span className="font-bold text-indigo-700 dark:text-indigo-300 block mb-2 flex items-center gap-2 uppercase text-[10px] tracking-widest">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                      Insights da IA
+                  </span>
+                  {aiResponse.answer}
+                </div>
+
+                {aiResponse.suggestedTransaction && (
+                  <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
+                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tight">Ação Sugerida</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {aiResponse.suggestedTransaction.type}: {aiResponse.suggestedTransaction.description} ({CURRENCY_FORMATTER.format(aiResponse.suggestedTransaction.amount)})
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => openSuggestedTransaction(aiResponse.suggestedTransaction!)}
+                      className="bg-slate-900 dark:bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:opacity-90 transition-all flex items-center gap-2 shadow-md hover:scale-105"
+                    >
+                      Preencher
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
+        <div className="flex justify-between items-center mb-4">
+             <h3 className="text-slate-700 dark:text-slate-300 font-semibold">Tendência Consolidada (7 Dias)</h3>
+             <span className="text-xs font-medium px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-slate-500 dark:text-slate-400">Toda a Rede</span>
+        </div>
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
-              <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(v: number) => CURRENCY_FORMATTER.format(v)} contentStyle={{borderRadius: '12px', border: 'none', shadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-              <Area type="monotone" dataKey="Entrada" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={3} />
-              <Area type="monotone" dataKey="Saída" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.1} strokeWidth={3} />
+              <defs>
+                <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorSaida" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.3} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
+              <YAxis hide />
+              <Tooltip 
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: '#fff', color: '#1e293b' }}
+                itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                formatter={(value: number) => [CURRENCY_FORMATTER.format(value), '']}
+              />
+              <Area type="monotone" dataKey="Entrada" stroke="#10b981" fillOpacity={1} fill="url(#colorEntrada)" strokeWidth={3} />
+              <Area type="monotone" dataKey="Saída" stroke="#f43f5e" fillOpacity={1} fill="url(#colorSaida)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
-      
-      {/* Cards de Unidades */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {establishments.map(est => {
-            const bal = transactions.filter(t => t.establishmentId === est.id).reduce((s, t) => t.type === TransactionType.ENTRADA ? s + t.amount : s - t.amount, 0);
+
+      <div>
+        <h3 className="text-slate-700 dark:text-slate-300 font-semibold mb-3">Detalhes por Estabelecimento</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {establishments.map(est => {
+            const balance = getEstablishmentBalance(est.id);
+            const isPositive = balance >= 0;
             return (
-              <button key={est.id} onClick={() => navigate(`/establishment/${est.id}`)} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-left group">
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 transition-colors">{est.name}</h4>
-                <div className={`text-2xl font-black mt-1 ${bal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{CURRENCY_FORMATTER.format(bal)}</div>
+              <button 
+                key={est.id}
+                onClick={() => navigate(`/establishment/${est.id}`)}
+                className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all text-left group animate-fade-in"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-slate-800 dark:text-white text-lg group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{est.name}</h4>
+                  <div className={`p-1.5 rounded-full ${isPositive ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'}`}>
+                    {isPositive ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                    )}
+                  </div>
+                </div>
+                <div className="text-2xl font-bold text-slate-700 dark:text-slate-200">
+                  {CURRENCY_FORMATTER.format(balance)}
+                </div>
+                <div className="text-sm text-slate-400 mt-1">
+                  Toque para ver detalhes
+                </div>
               </button>
             );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );
