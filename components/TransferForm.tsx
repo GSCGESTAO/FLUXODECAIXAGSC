@@ -38,7 +38,8 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
 
     setIsSubmitting(true);
 
-    const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+    // Correção: Para input type="number", o valor já vem com ponto decimal padrão.
+    const numericAmount = parseFloat(amount) || 0;
     const sourceEst = establishments.find(e => e.id === sourceId);
     const targetEst = establishments.find(e => e.id === targetId);
 
@@ -135,7 +136,17 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
         <div className="space-y-6">
             <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor a Transferir (R$)</label>
-            <input type="number" step="0.01" required min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full text-3xl font-bold p-3 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-300" placeholder="0,00" />
+            <input 
+              type="number" 
+              step="0.01" 
+              inputMode="decimal"
+              required 
+              min="0.01" 
+              value={amount} 
+              onChange={(e) => setAmount(e.target.value)} 
+              className="w-full text-3xl font-bold p-3 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-300" 
+              placeholder="0.00" 
+            />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

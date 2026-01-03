@@ -53,7 +53,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
     setIsSubmitting(true);
     setAnomalyWarning(null);
 
-    const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+    // Correção: Para input type="number", o valor já vem com ponto decimal padrão. 
+    // Não devemos remover pontos, pois eles representam os decimais.
+    const numericAmount = parseFloat(amount) || 0;
     
     // Anomaly check only if not already warned
     if (!anomalyWarning) {
@@ -105,7 +107,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor (R$)</label>
-          <input type="number" step="0.01" required min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full text-2xl font-bold p-3 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white" placeholder="0,00" />
+          <input 
+            type="number" 
+            step="0.01" 
+            inputMode="decimal"
+            required 
+            min="0" 
+            value={amount} 
+            onChange={(e) => setAmount(e.target.value)} 
+            className="w-full text-2xl font-bold p-3 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white" 
+            placeholder="0.00" 
+          />
         </div>
 
         <div>
