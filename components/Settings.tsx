@@ -1,39 +1,50 @@
 
 import React, { useState } from 'react';
-import { Establishment, AuthorizedUser, AppSettings } from '../types';
+import { Establishment, AuthorizedUser, AppSettings, UserRole } from '../types';
 
 interface SettingsProps {
   establishments: Establishment[];
   authorizedUsers: AuthorizedUser[];
   onAddEstablishment: (est: Establishment) => void;
   onUpdateEstablishment: (est: Establishment) => void;
-  onAddUser: (email: string) => void;
+  onAddUser: (email: string, role: UserRole) => void;
+  onEditUser: (id: string, email: string, role: UserRole) => void;
+  onDeleteUser: (id: string) => void;
   darkMode: boolean;
   setDarkMode: (value: boolean) => void;
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
+  userRole?: UserRole | null;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
   establishments, 
   authorizedUsers,
   onAddEstablishment, 
-  onUpdateEstablishment,
   onAddUser,
+  onEditUser,
+  onDeleteUser,
   darkMode, 
   setDarkMode,
   settings,
-  onUpdateSettings
+  onUpdateSettings,
+  userRole
 }) => {
-  const [activeTab, setActiveTab] = useState<'estab' | 'desc' | 'users' | 'pref'>('estab');
+  const isAdmin = userRole === 'Admin';
+  const isFinanceiro = userRole === 'Financeiro';
   
-  // Establishment States
+  const [activeTab, setActiveTab] = useState<'pref' | 'desc' | 'estab' | 'users'>(isAdmin ? 'estab' : 'pref');
+  
+  // States para Usuários
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [editingUser, setEditingUser] = useState<AuthorizedUser | null>(null);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('Convidado');
+
+  // States para Estabelecimentos
   const [isAddingEst, setIsAddingEst] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-
-  // User State
-  const [newUserEmail, setNewUserEmail] = useState('');
 
   const handleUpdatePreference = (key: keyof AppSettings, value: any) => {
     onUpdateSettings({ ...settings, [key]: value });
@@ -48,10 +59,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const Toggle = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (v: boolean) => void }) => (
     <div className="flex justify-between items-center py-4 border-b border-slate-100 dark:border-slate-700 last:border-0">
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
-      <button 
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
-      >
+      <button onClick={() => onChange(!checked)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}>
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
       </button>
     </div>
@@ -61,124 +69,107 @@ export const Settings: React.FC<SettingsProps> = ({
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Ajustes do Sistema</h2>
 
-      {/* Tabs Navigation */}
       <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl overflow-x-auto scrollbar-hide">
-        {[
-          { id: 'estab', label: 'Estabelecimentos' },
-          { id: 'desc', label: 'Descrições' },
-          { id: 'users', label: 'Usuários' },
-          { id: 'pref', label: 'Preferências' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {isAdmin && <button onClick={() => setActiveTab('estab')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'estab' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Unidades</button>}
+        {isAdmin && <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Usuários</button>}
+        {(isAdmin || isFinanceiro) && <button onClick={() => setActiveTab('desc')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'desc' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Descrições</button>}
+        <button onClick={() => setActiveTab('pref')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'pref' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Preferências</button>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         
-        {/* Tab: Estabelecimentos */}
-        {activeTab === 'estab' && (
+        {/* Tab: Estabelecimentos (Admin Only) */}
+        {activeTab === 'estab' && isAdmin && (
           <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-              <h3 className="font-bold text-slate-700 dark:text-slate-200">Unidades Ativas</h3>
-              <button onClick={() => setIsAddingEst(!isAddingEst)} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700">{isAddingEst ? 'Fechar' : 'Nova Unidade'}</button>
+              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500">Unidades da Rede</h3>
+              <button onClick={() => setIsAddingEst(!isAddingEst)} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">{isAddingEst ? 'Fechar' : 'Nova Unidade'}</button>
             </div>
             {isAddingEst && (
-              <form className="p-6 space-y-3 bg-indigo-50/30 dark:bg-indigo-900/10" onSubmit={e => {
-                e.preventDefault();
-                onAddEstablishment({ id: crypto.randomUUID(), name: newName, responsibleEmail: newEmail });
-                setNewName(''); setNewEmail(''); setIsAddingEst(false);
-              }}>
+              <form className="p-6 space-y-3 bg-indigo-50/20" onSubmit={e => { e.preventDefault(); onAddEstablishment({ id: crypto.randomUUID(), name: newName, responsibleEmail: newEmail }); setNewName(''); setNewEmail(''); setIsAddingEst(false); }}>
                 <input required placeholder="Nome do Restaurante" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
-                <input required type="email" placeholder="Email do Gerente" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
-                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">Cadastrar</button>
+                <input required type="email" placeholder="Email Gerente" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
+                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">Cadastrar Unidade</button>
               </form>
             )}
             {establishments.map(est => (
               <div key={est.id} className="p-6 flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-slate-800 dark:text-white">{est.name}</div>
-                  <div className="text-xs text-slate-400 font-medium">{est.responsibleEmail}</div>
-                </div>
+                <div><div className="font-bold text-slate-800 dark:text-white">{est.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase">{est.responsibleEmail}</div></div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tab: Descrições Prontas */}
-        {activeTab === 'desc' && (
-          <div className="p-6 space-y-6 animate-fade-in">
-            <div>
-              <h3 className="font-bold text-slate-800 dark:text-white mb-2">Descrições Rápidas (Até 4)</h3>
-              <p className="text-xs text-slate-500 mb-6">Estas descrições aparecerão como botões de atalho na tela de novo lançamento.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[0, 1, 2, 3].map(i => (
-                  <div key={i} className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Opção {i + 1}</label>
-                    <input 
-                      value={settings.readyDescriptions[i] || ""} 
-                      onChange={e => handleUpdateDescription(i, e.target.value)}
-                      placeholder="Ex: Compra Bebidas" 
-                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                    />
-                  </div>
-                ))}
-              </div>
+        {/* Tab: Usuários (Admin Only) */}
+        {activeTab === 'users' && isAdmin && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500">Gestão de Acessos</h3>
+              <button onClick={() => { setIsAddingUser(!isAddingUser); setEditingUser(null); }} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">{isAddingUser ? 'Fechar' : 'Novo Usuário'}</button>
+            </div>
+            
+            {(isAddingUser || editingUser) && (
+              <form className="p-6 space-y-4 bg-indigo-50/20" onSubmit={e => {
+                e.preventDefault();
+                if (editingUser) onEditUser(editingUser.email, newUserEmail, newUserRole);
+                else onAddUser(newUserEmail, newUserRole);
+                setNewUserEmail(''); setIsAddingUser(false); setEditingUser(null);
+              }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input required type="email" placeholder="Email Gmail" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
+                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as UserRole)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold">
+                    <option value="Admin">Admin</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Convidado">Convidado</option>
+                  </select>
+                </div>
+                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">{editingUser ? 'Confirmar Alterações' : 'Autorizar E-mail'}</button>
+              </form>
+            )}
+
+            <div className="p-6 space-y-3">
+               {authorizedUsers.map(u => (
+                 <div key={u.email} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border dark:border-slate-700 transition-all hover:border-indigo-300">
+                   <div>
+                     <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{u.email}</div>
+                     <div className="text-[9px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded inline-block font-black uppercase tracking-widest mt-1">{u.role}</div>
+                   </div>
+                   <div className="flex gap-2">
+                      <button onClick={() => { setEditingUser(u); setNewUserEmail(u.email); setNewUserRole(u.role); setIsAddingUser(false); }} className="p-2 text-slate-400 hover:text-indigo-600"><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                      <button onClick={() => confirm("Excluir acesso de " + u.email + "?") && onDeleteUser(u.email)} className="p-2 text-slate-400 hover:text-rose-600"><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                   </div>
+                 </div>
+               ))}
             </div>
           </div>
         )}
 
-        {/* Tab: Usuários */}
-        {activeTab === 'users' && (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
-             <div className="p-6">
-               <h3 className="font-bold text-slate-800 dark:text-white mb-4">Autorizar Novo E-mail</h3>
-               <div className="flex gap-2">
-                 <input 
-                  type="email" 
-                  value={newUserEmail} 
-                  onChange={e => setNewUserEmail(e.target.value)}
-                  placeholder="email@gmail.com" 
-                  className="flex-1 p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm" 
-                 />
-                 <button 
-                  onClick={() => { if(newUserEmail) { onAddUser(newUserEmail); setNewUserEmail(""); } }}
-                  className="bg-indigo-600 text-white px-6 rounded-xl font-bold text-xs"
-                 >Adicionar</button>
-               </div>
-             </div>
-             <div className="p-6 space-y-4">
-               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Usuários com Acesso</h4>
-               {authorizedUsers.map(u => (
-                 <div key={u.email} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
-                   <div className="text-sm font-medium text-slate-700 dark:text-slate-300">{u.email}</div>
-                   <div className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 px-2 py-1 rounded-md font-bold uppercase">{u.role}</div>
-                 </div>
-               ))}
-             </div>
+        {/* Tab: Descrições (Admin & Financeiro) */}
+        {activeTab === 'desc' && (isAdmin || isFinanceiro) && (
+          <div className="p-6 space-y-6 animate-fade-in">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500 mb-4">Descrições Rápidas (Max 4)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[0, 1, 2, 3].map(i => (
+                  <div key={i}>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Atalho {i + 1}</label>
+                    <input value={settings.readyDescriptions[i] || ""} onChange={e => handleUpdateDescription(i, e.target.value)} placeholder="Ex: Compra Insumos" className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                  </div>
+                ))}
+              </div>
           </div>
         )}
 
-        {/* Tab: Preferências (Toggles) */}
+        {/* Tab: Preferências */}
         {activeTab === 'pref' && (
           <div className="p-6 space-y-1 animate-fade-in">
              <Toggle label="Modo Escuro" checked={darkMode} onChange={setDarkMode} />
              <Toggle label="Exibir Mural de Anotações" checked={settings.showNotes} onChange={v => handleUpdatePreference('showNotes', v)} />
              <Toggle label="Exibir Assistente Financeiro IA" checked={settings.showAI} onChange={v => handleUpdatePreference('showAI', v)} />
-             <Toggle label="Exibir Gráfico de Tendência (Curva)" checked={settings.showChart} onChange={v => handleUpdatePreference('showChart', v)} />
-             <Toggle label="Notificações de Lançamentos (Navegador)" checked={settings.pushNotifications} onChange={v => handleUpdatePreference('pushNotifications', v)} />
-             <Toggle label="Resumo Semanal para Email do Gerente" checked={settings.weeklyEmailSummary} onChange={v => handleUpdatePreference('weeklyEmailSummary', v)} />
+             <Toggle label="Exibir Gráfico de Tendência" checked={settings.showChart} onChange={v => handleUpdatePreference('showChart', v)} />
+             <Toggle label="Notificações em Segundo Plano" checked={settings.pushNotifications} onChange={v => handleUpdatePreference('pushNotifications', v)} />
+             <Toggle label="Relatório Semanal Automático" checked={settings.weeklyEmailSummary} onChange={v => handleUpdatePreference('weeklyEmailSummary', v)} />
           </div>
         )}
-      </div>
-
-      <div className="text-center">
-         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Fluxo GSC v1.6 Cloud</p>
       </div>
     </div>
   );

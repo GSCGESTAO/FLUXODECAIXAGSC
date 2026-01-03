@@ -11,7 +11,7 @@ import { Reports } from './components/Reports';
 import { Login } from './components/Login';
 import { AccessDenied } from './components/AccessDenied';
 import { MOCK_ESTABLISHMENTS, MOCK_TRANSACTIONS, SHEET_API_URL } from './constants';
-import { Transaction, Establishment, UserProfile, AuthorizedUser, AppSettings } from './types';
+import { Transaction, Establishment, UserProfile, AuthorizedUser, AppSettings, UserRole } from './types';
 import { fetchSheetData, postToSheet } from './services/sheetService';
 
 const App: React.FC = () => {
@@ -20,6 +20,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
   
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
@@ -66,6 +67,7 @@ const App: React.FC = () => {
   const syncData = useCallback(async () => {
     if (!SHEET_API_URL) {
       setIsAuthorized(true);
+      setUserRole('Admin');
       return;
     }
 
@@ -114,16 +116,25 @@ const App: React.FC = () => {
         
         if (user) {
           const userEmailClean = user.email.toLowerCase().trim();
-          const isUserInList = data.authorizedUsers.some(
+          const authUser = data.authorizedUsers.find(
             u => u.email.toLowerCase().trim() === userEmailClean
           );
-          setIsAuthorized(isUserInList);
+          
+          if (authUser) {
+            setIsAuthorized(true);
+            setUserRole(authUser.role);
+          } else {
+            setIsAuthorized(false);
+          }
         }
       }
     } catch (err) {
       console.error("Erro no sync:", err);
       setSyncError(true);
-      if (lastSync === null) setIsAuthorized(true);
+      if (lastSync === null) {
+        setIsAuthorized(true);
+        setUserRole('Admin');
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -156,9 +167,11 @@ const App: React.FC = () => {
     localStorage.removeItem('gsc_user');
     setUser(null);
     setIsAuthorized(null);
+    setUserRole(null);
   };
 
   const handleSaveTransaction = async (transaction: Transaction) => {
+    if (userRole === 'Convidado') return;
     const enriched = { ...transaction, user: user?.email || 'unknown', isSynced: false };
     setTransactions(prev => [enriched, ...prev]);
     
@@ -174,6 +187,7 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = async (updatedTransaction: Transaction) => {
+    if (userRole === 'Convidado') return;
     setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...updatedTransaction, isSynced: false } : t));
     
     if (SHEET_API_URL) {
@@ -185,6 +199,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveNote = async (newNote: string, entityId: string = "GENERAL") => {
+    if (userRole === 'Convidado') return;
     const updatedNotes = { ...notes, [entityId]: newNote };
     setNotes(updatedNotes);
     localStorage.setItem('gsc_notes_map', JSON.stringify(updatedNotes));
@@ -199,6 +214,7 @@ const App: React.FC = () => {
   };
 
   const handleAddEstablishment = async (establishment: Establishment) => {
+    if (userRole !== 'Admin') return;
     setEstablishments(prev => [...prev, establishment]);
     if (SHEET_API_URL) {
       await postToSheet(SHEET_API_URL, 'ADD_ESTABLISHMENT', { ...establishment, user: user?.email });
@@ -206,19 +222,38 @@ const App: React.FC = () => {
   };
 
   const handleUpdateEstablishment = (updatedEstablishment: Establishment) => {
+    if (userRole !== 'Admin') return;
     setEstablishments(prev => prev.map(est => est.id === updatedEstablishment.id ? updatedEstablishment : est));
   };
 
   const handleUpdateSettings = async (newSettings: AppSettings) => {
+    if (userRole === 'Convidado') return;
     setSettings(newSettings);
     if (SHEET_API_URL) {
       await postToSheet(SHEET_API_URL, 'UPDATE_SETTINGS', { settings: newSettings, user: user?.email });
     }
   };
 
-  const handleAddUser = async (email: string) => {
+  const handleAddUser = async (email: string, role: UserRole) => {
+    if (userRole !== 'Admin') return;
     if (SHEET_API_URL) {
-      await postToSheet(SHEET_API_URL, 'ADD_USER', { email, role: 'Operador', user: user?.email });
+      await postToSheet(SHEET_API_URL, 'ADD_USER', { email, role, user: user?.email });
+      syncData();
+    }
+  };
+
+  const handleEditUser = async (id: string, email: string, role: UserRole) => {
+    if (userRole !== 'Admin') return;
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'EDIT_USER', { id, email, role, user: user?.email });
+      syncData();
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (userRole !== 'Admin') return;
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'DELETE_USER', { id, user: user?.email });
       syncData();
     }
   };
@@ -249,13 +284,14 @@ const App: React.FC = () => {
         user={user}
         onLogout={handleLogout}
         pendingCount={transactions.filter(t => !t.isSynced).length}
+        userRole={userRole}
       >
         <Routes>
-          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} settings={settings} />} />
-          <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} settings={settings} />} />
-          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
-          <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
-          <Route path="/settings" element={<Settings establishments={establishments} authorizedUsers={authorizedUsers} onAddEstablishment={handleAddEstablishment} onUpdateEstablishment={handleUpdateEstablishment} onAddUser={handleAddUser} darkMode={darkMode} setDarkMode={setDarkMode} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
+          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} settings={settings} userRole={userRole} />} />
+          <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} settings={settings} userRole={userRole} />} />
+          <Route path="/new" element={userRole === 'Convidado' ? <Navigate to="/" /> : <TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
+          <Route path="/transfer" element={userRole === 'Convidado' ? <Navigate to="/" /> : <TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
+          <Route path="/settings" element={<Settings establishments={establishments} authorizedUsers={authorizedUsers} onAddEstablishment={handleAddEstablishment} onUpdateEstablishment={handleUpdateEstablishment} onAddUser={handleAddUser} onEditUser={handleEditUser} onDeleteUser={handleDeleteUser} darkMode={darkMode} setDarkMode={setDarkMode} settings={settings} onUpdateSettings={handleUpdateSettings} userRole={userRole} />} />
           <Route path="/reports" element={<Reports establishments={establishments} transactions={transactions} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

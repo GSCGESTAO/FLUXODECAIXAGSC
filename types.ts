@@ -17,9 +17,12 @@ export interface UserProfile {
   token: string;
 }
 
+export type UserRole = 'Admin' | 'Financeiro' | 'Convidado';
+
 export interface AuthorizedUser {
+  id?: string;
   email: string;
-  role: 'Admin' | 'Operador' | 'Visualizador';
+  role: UserRole;
 }
 
 export interface Establishment {

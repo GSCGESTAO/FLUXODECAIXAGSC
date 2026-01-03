@@ -1,7 +1,7 @@
 
-import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Establishment, Transaction, TransactionType, AppSettings } from '../types';
+// Added UserRole to imports
+import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
 import { askFinancialAssistant, AiAssistantResponse } from '../services/geminiService';
 
@@ -10,13 +10,16 @@ interface EstablishmentDetailProps {
   transactions: Transaction[];
   onUpdateTransaction: (t: Transaction) => void;
   settings: AppSettings;
+  // Added userRole to props interface
+  userRole?: UserRole | null;
 }
 
-const IS_ADMIN = true;
-
-export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establishments, transactions, onUpdateTransaction, settings }) => {
+// Removed hardcoded IS_ADMIN constant
+export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establishments, transactions, onUpdateTransaction, settings, userRole }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Added isAdmin check based on userRole prop
+  const isAdmin = userRole === 'Admin';
   const [question, setQuestion] = useState('');
   const [aiResponse, setAiResponse] = useState<AiAssistantResponse | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
@@ -102,7 +105,8 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
               </div>
               <div className="flex items-center gap-4">
                   <div className={`font-black text-sm ${t.type === TransactionType.ENTRADA ? 'text-emerald-600' : 'text-rose-600'}`}>{t.type === TransactionType.ENTRADA ? '+' : '-'} {CURRENCY_FORMATTER.format(t.amount)}</div>
-                  {IS_ADMIN && <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>}
+                  {/* Used dynamic isAdmin instead of hardcoded IS_ADMIN */}
+                  {isAdmin && <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>}
               </div>
             </div>
           ))}
