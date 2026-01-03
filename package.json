@@ -1,7 +1,8 @@
+
 {
-  "name": "fluxo-de-caixa-gsc-cloud",
+  "name": "fluxo-gsc-cloud",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,23 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.3",
     "@google/genai": "^1.34.0",
-    "recharts": "^3.6.0",
-    "react-router-dom": "^7.11.0",
+    "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "vite": "^7.3.0",
-    "url": "^0.11.4",
-    "path": "^0.12.7",
-    "@vitejs/plugin-react": "^5.1.2",
-    "express": "^5.2.1",
-    "os": "^0.1.2"
+    "react-router-dom": "^7.11.0",
+    "recharts": "^3.6.0"
   },
- "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "terser": "^5.31.0"
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "terser": "^5.31.0",
+    "vite": "^7.3.0"
   }
 }
