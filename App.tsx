@@ -14,20 +14,15 @@ import { MOCK_ESTABLISHMENTS, MOCK_TRANSACTIONS, SHEET_API_URL } from './constan
 import { Transaction, Establishment, UserProfile, AuthorizedUser } from './types';
 import { fetchSheetData, postTransactionToSheet } from './services/sheetService';
 
-// Usuário de bypass para quando a autenticação está desativada
-const BYPASS_USER: UserProfile = {
-  email: 'admin@gsc.com',
-  name: 'Modo Desenvolvedor',
-  picture: 'https://ui-avatars.com/api/?name=GSC+Admin&background=4f46e5&color=fff',
-  token: 'mock-token'
-};
-
 const App: React.FC = () => {
-  // Autenticação desativada: inicia com usuário BYPASS
-  const [user, setUser] = useState<UserProfile | null>(BYPASS_USER);
+  // Restore user from localStorage
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('gsc_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   
-  // Autorização forçada para true
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(true);
+  // Authorization State
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
 
   // Data State
@@ -56,10 +51,6 @@ const App: React.FC = () => {
       setEstablishments(data.establishments);
       setTransactions(data.transactions);
       setAuthorizedUsers(data.authorizedUsers);
-      
-      // Mantemos autorizado independente da verificação na planilha enquanto a auth estiver off
-      setIsAuthorized(true);
-      
       setLastSync(new Date());
     } else {
       setSyncError(true);
@@ -72,18 +63,33 @@ const App: React.FC = () => {
     syncData();
   }, [syncData]);
 
+  // Authorization Check Logic
+  useEffect(() => {
+    if (user && authorizedUsers.length > 0) {
+      const isUserInList = authorizedUsers.some(
+        u => u.email.toLowerCase() === user.email.toLowerCase()
+      );
+      setIsAuthorized(isUserInList);
+    } else if (user && authorizedUsers.length === 0 && !isSyncing && lastSync) {
+      // If sync finished and list is still empty, and we have a user
+      setIsAuthorized(false);
+    }
+  }, [user, authorizedUsers, isSyncing, lastSync]);
+
   // Dark mode side effect
   useEffect(() => {
     localStorage.setItem('gsc_dark_mode', String(darkMode));
   }, [darkMode]);
 
   const handleLogin = (newUser: UserProfile) => {
+    localStorage.setItem('gsc_user', JSON.stringify(newUser));
     setUser(newUser);
   };
 
   const handleLogout = () => {
-    // No modo bypass, logout apenas reseta para o usuário bypass ou você pode optar por manter logado
-    console.log("Logout desativado no modo bypass");
+    localStorage.removeItem('gsc_user');
+    setUser(null);
+    setIsAuthorized(null);
   };
 
   const handleSaveTransaction = async (transaction: Transaction) => {
@@ -111,7 +117,29 @@ const App: React.FC = () => {
     );
   };
 
-  // Renderização principal sem bloqueios de login
+  // 1. If not logged in, show Login Screen
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  // 2. If logged in but not yet checked authorization or syncing first time
+  if (isAuthorized === null && isSyncing && !lastSync) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Verificando credenciais...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. If logged in but NOT authorized
+  if (isAuthorized === false) {
+    return <AccessDenied email={user.email} onLogout={handleLogout} />;
+  }
+
+  // 4. Authorized Access
   return (
     <HashRouter>
       <Layout 
@@ -120,7 +148,7 @@ const App: React.FC = () => {
         lastSync={lastSync} 
         onSync={SHEET_API_URL ? syncData : undefined}
         syncError={syncError}
-        user={user!}
+        user={user}
         onLogout={handleLogout}
       >
         <Routes>
@@ -133,8 +161,8 @@ const App: React.FC = () => {
               onUpdateTransaction={handleUpdateTransaction}
             />} 
           />
-          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user!.email} />} />
-          <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user!.email} />} />
+          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
+          <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
           <Route 
             path="/settings" 
             element={
