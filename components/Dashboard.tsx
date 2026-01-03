@@ -388,25 +388,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
           })}
         </div>
       </div>
-
-      <div className="fixed bottom-24 md:bottom-6 right-6 flex items-center gap-3 z-30">
-        <button 
-          onClick={() => navigate('/transfer')}
-          className="w-12 h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 border-2 border-white dark:border-slate-800"
-          aria-label="Transferência"
-          title="Transferência entre Contas"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8l4 4m0 0l-4 4m4-4H3m13-4V4m-4 16v-4"/></svg>
-        </button>
-
-        <button 
-            onClick={() => navigate('/new')}
-            className="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 border-2 border-white dark:border-slate-800"
-            aria-label="Nova Transação"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        </button>
-      </div>
     </div>
   );
 };
