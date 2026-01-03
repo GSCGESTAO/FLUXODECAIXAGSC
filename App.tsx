@@ -46,51 +46,56 @@ const App: React.FC = () => {
     setIsSyncing(true);
     setSyncError(false);
     
-    const data = await fetchSheetData(SHEET_API_URL);
-    if (data) {
-      setEstablishments(data.establishments);
-      setTransactions(data.transactions);
-      setAuthorizedUsers(data.authorizedUsers);
-      setLastSync(new Date());
-      
-      // Se tivermos um usuário, verificamos imediatamente após o sync
-      if (user) {
-        const isUserInList = data.authorizedUsers.some(
-          u => u.email.toLowerCase().trim() === user.email.toLowerCase().trim()
-        );
-        setIsAuthorized(isUserInList);
+    try {
+      const data = await fetchSheetData(SHEET_API_URL);
+      if (data) {
+        setEstablishments(data.establishments);
+        setTransactions(data.transactions);
+        setAuthorizedUsers(data.authorizedUsers);
+        setLastSync(new Date());
+        
+        // Se tivermos um usuário logado, verificamos a permissão imediatamente
+        if (user) {
+          const userEmailClean = user.email.toLowerCase().trim();
+          const isUserInList = data.authorizedUsers.some(
+            u => u.email.toLowerCase().trim() === userEmailClean
+          );
+          setIsAuthorized(isUserInList);
+        }
+      } else {
+        setSyncError(true);
+        // Se falhou o sync mas já temos dados mockados, não bloqueamos se for a primeira vez
+        if (lastSync === null) setIsAuthorized(true); 
       }
-    } else {
+    } catch (err) {
+      console.error("Erro no sync:", err);
       setSyncError(true);
+    } finally {
+      setIsSyncing(false);
     }
-    setIsSyncing(false);
-  }, [user]);
+  }, [user, lastSync]);
 
   // Initial Sync
   useEffect(() => {
     syncData();
-  }, []); // Só no mount inicial
-
-  // Authorization Check Logic (Fallback e monitoramento)
-  useEffect(() => {
-    if (user && authorizedUsers.length > 0) {
-      const isUserInList = authorizedUsers.some(
-        u => u.email.toLowerCase().trim() === user.email.toLowerCase().trim()
-      );
-      setIsAuthorized(isUserInList);
-    } else if (user && authorizedUsers.length === 0 && !isSyncing && lastSync) {
-      setIsAuthorized(false);
-    }
-  }, [user, authorizedUsers, isSyncing, lastSync]);
+  }, []); 
 
   // Dark mode side effect
   useEffect(() => {
     localStorage.setItem('gsc_dark_mode', String(darkMode));
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [darkMode]);
 
   const handleLogin = (newUser: UserProfile) => {
     localStorage.setItem('gsc_user', JSON.stringify(newUser));
     setUser(newUser);
+    // Forçar verificação após login
+    setIsAuthorized(null);
+    syncData();
   };
 
   const handleLogout = () => {
@@ -131,13 +136,13 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
-  // 2. If logged in but not yet checked authorization or syncing first time
-  if (isAuthorized === null && isSyncing && !lastSync) {
+  // 2. If logged in but not yet checked authorization OR syncing first time
+  if (isAuthorized === null) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Verificando credenciais...</p>
+          <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Autenticando permissões...</p>
         </div>
       </div>
     );
