@@ -52,26 +52,33 @@ const App: React.FC = () => {
       setTransactions(data.transactions);
       setAuthorizedUsers(data.authorizedUsers);
       setLastSync(new Date());
+      
+      // Se tivermos um usuário, verificamos imediatamente após o sync
+      if (user) {
+        const isUserInList = data.authorizedUsers.some(
+          u => u.email.toLowerCase().trim() === user.email.toLowerCase().trim()
+        );
+        setIsAuthorized(isUserInList);
+      }
     } else {
       setSyncError(true);
     }
     setIsSyncing(false);
-  }, []);
+  }, [user]);
 
   // Initial Sync
   useEffect(() => {
     syncData();
-  }, [syncData]);
+  }, []); // Só no mount inicial
 
-  // Authorization Check Logic
+  // Authorization Check Logic (Fallback e monitoramento)
   useEffect(() => {
     if (user && authorizedUsers.length > 0) {
       const isUserInList = authorizedUsers.some(
-        u => u.email.toLowerCase() === user.email.toLowerCase()
+        u => u.email.toLowerCase().trim() === user.email.toLowerCase().trim()
       );
       setIsAuthorized(isUserInList);
     } else if (user && authorizedUsers.length === 0 && !isSyncing && lastSync) {
-      // If sync finished and list is still empty, and we have a user
       setIsAuthorized(false);
     }
   }, [user, authorizedUsers, isSyncing, lastSync]);
@@ -90,6 +97,8 @@ const App: React.FC = () => {
     localStorage.removeItem('gsc_user');
     setUser(null);
     setIsAuthorized(null);
+    setAuthorizedUsers([]);
+    setLastSync(null);
   };
 
   const handleSaveTransaction = async (transaction: Transaction) => {
@@ -136,7 +145,7 @@ const App: React.FC = () => {
 
   // 3. If logged in but NOT authorized
   if (isAuthorized === false) {
-    return <AccessDenied email={user.email} onLogout={handleLogout} />;
+    return <AccessDenied email={user.email} onLogout={handleLogout} onRefresh={syncData} />;
   }
 
   // 4. Authorized Access

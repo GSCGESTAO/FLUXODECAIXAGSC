@@ -89,7 +89,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div id="googleBtn" className="flex justify-center transition-transform hover:scale-[1.02] active:scale-[0.98]"></div>
             
             <p className="mt-6 text-[11px] text-slate-400 dark:text-slate-500 max-w-[280px] mx-auto leading-normal">
-              Utilize suas credenciais corporativas @gsc.com para autenticação automática.
+              Utilize o e-mail (pessoal ou corporativo) que foi autorizado pelo seu administrador na planilha de controle.
             </p>
           </div>
           

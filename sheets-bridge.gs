@@ -19,7 +19,7 @@
     const establishments = estValues.slice(1).map(row => ({
       id: String(row[0]),
       name: String(row[1]),
-      responsibleEmail: String(row[2])
+      responsibleEmail: String(row[2]).trim()
     }));
 
     // 2. Get Authorized Users
@@ -27,10 +27,12 @@
     let authorizedUsers = [];
     if (userSheet) {
       const userValues = userSheet.getDataRange().getValues();
-      authorizedUsers = userValues.slice(1).map(row => ({
-        email: String(row[1]).toLowerCase(),
-        role: String(row[2])
-      }));
+      authorizedUsers = userValues.slice(1)
+        .filter(row => row[1]) // Filtra linhas vazias
+        .map(row => ({
+          email: String(row[1]).toLowerCase().trim(),
+          role: String(row[2])
+        }));
     }
 
     // 3. Get Transactions
@@ -101,7 +103,6 @@
     if (!userSheet) {
       userSheet = ss.insertSheet("Usuarios");
       userSheet.appendRow(["ID", "Email", "Cargo"]);
-      // Adicione seu email aqui para o primeiro teste
       userSheet.appendRow(["1", "seu-email@gmail.com", "Admin"]);
     }
 
