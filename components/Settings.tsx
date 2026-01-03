@@ -8,8 +8,8 @@ interface SettingsProps {
   onAddEstablishment: (est: Establishment) => void;
   onUpdateEstablishment: (est: Establishment) => void;
   onAddUser: (email: string, role: UserRole) => void;
-  onEditUser: (id: string, email: string, role: UserRole) => void;
-  onDeleteUser: (id: string) => void;
+  onEditUser: (oldEmail: string, email: string, role: UserRole) => void;
+  onDeleteUser: (email: string) => void;
   darkMode: boolean;
   setDarkMode: (value: boolean) => void;
   settings: AppSettings;
@@ -18,43 +18,15 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
-  establishments, 
-  authorizedUsers,
-  onAddEstablishment, 
-  onAddUser,
-  onEditUser,
-  onDeleteUser,
-  darkMode, 
-  setDarkMode,
-  settings,
-  onUpdateSettings,
-  userRole
+  establishments, authorizedUsers, onAddEstablishment, onUpdateEstablishment, 
+  onAddUser, onEditUser, onDeleteUser, darkMode, setDarkMode, settings, onUpdateSettings, userRole 
 }) => {
   const isAdmin = userRole === 'Admin';
   const isFinanceiro = userRole === 'Financeiro';
-  
-  const [activeTab, setActiveTab] = useState<'pref' | 'desc' | 'estab' | 'users'>(isAdmin ? 'estab' : 'pref');
-  
-  // States para Usuários
-  const [isAddingUser, setIsAddingUser] = useState(false);
-  const [editingUser, setEditingUser] = useState<AuthorizedUser | null>(null);
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('Convidado');
+  const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'pref'>(isAdmin ? 'estab' : 'pref');
 
-  // States para Estabelecimentos
-  const [isAddingEst, setIsAddingEst] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-
-  const handleUpdatePreference = (key: keyof AppSettings, value: any) => {
-    onUpdateSettings({ ...settings, [key]: value });
-  };
-
-  const handleUpdateDescription = (index: number, value: string) => {
-    const newDescs = [...settings.readyDescriptions];
-    newDescs[index] = value;
-    handleUpdatePreference('readyDescriptions', newDescs);
-  };
+  const [formEst, setFormEst] = useState<{id?: string, name: string, email: string} | null>(null);
+  const [formUser, setFormUser] = useState<{oldEmail?: string, email: string, role: UserRole} | null>(null);
 
   const Toggle = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (v: boolean) => void }) => (
     <div className="flex justify-between items-center py-4 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -65,9 +37,12 @@ export const Settings: React.FC<SettingsProps> = ({
     </div>
   );
 
+  const EditIcon = () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+  const TrashIcon = () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
-      <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Ajustes do Sistema</h2>
+      <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Ajustes</h2>
 
       <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl overflow-x-auto scrollbar-hide">
         {isAdmin && <button onClick={() => setActiveTab('estab')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'estab' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Unidades</button>}
@@ -76,98 +51,107 @@ export const Settings: React.FC<SettingsProps> = ({
         <button onClick={() => setActiveTab('pref')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'pref' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Preferências</button>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
         
-        {/* Tab: Estabelecimentos (Admin Only) */}
         {activeTab === 'estab' && isAdmin && (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
-            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500">Unidades da Rede</h3>
-              <button onClick={() => setIsAddingEst(!isAddingEst)} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">{isAddingEst ? 'Fechar' : 'Nova Unidade'}</button>
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            <div className="p-6 bg-slate-50 dark:bg-slate-900/30 flex justify-between items-center">
+              <h3 className="font-bold text-sm uppercase text-slate-400">Gerenciar Unidades</h3>
+              <button onClick={() => setFormEst({name: '', email: ''})} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Novo Restaurante</button>
             </div>
-            {isAddingEst && (
-              <form className="p-6 space-y-3 bg-indigo-50/20" onSubmit={e => { e.preventDefault(); onAddEstablishment({ id: crypto.randomUUID(), name: newName, responsibleEmail: newEmail }); setNewName(''); setNewEmail(''); setIsAddingEst(false); }}>
-                <input required placeholder="Nome do Restaurante" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
-                <input required type="email" placeholder="Email Gerente" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
-                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">Cadastrar Unidade</button>
-              </form>
+            {formEst && (
+              <div className="p-6 bg-indigo-50/20 space-y-3">
+                 <input placeholder="Nome" value={formEst.name} onChange={e => setFormEst({...formEst, name: e.target.value})} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900" />
+                 <input placeholder="E-mail Gerente" value={formEst.email} onChange={e => setFormEst({...formEst, email: e.target.value})} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900" />
+                 <div className="flex gap-2">
+                    <button onClick={() => setFormEst(null)} className="flex-1 py-3 bg-slate-200 text-slate-600 rounded-xl font-bold">Cancelar</button>
+                    <button onClick={() => {
+                        if (formEst.id) onUpdateEstablishment({id: formEst.id, name: formEst.name, responsibleEmail: formEst.email});
+                        else onAddEstablishment({id: crypto.randomUUID(), name: formEst.name, responsibleEmail: formEst.email});
+                        setFormEst(null);
+                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold">Salvar</button>
+                 </div>
+              </div>
             )}
             {establishments.map(est => (
-              <div key={est.id} className="p-6 flex justify-between items-center">
+              <div key={est.id} className="p-6 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/30">
                 <div><div className="font-bold text-slate-800 dark:text-white">{est.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase">{est.responsibleEmail}</div></div>
+                <button onClick={() => setFormEst({id: est.id, name: est.name, email: est.responsibleEmail})} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tab: Usuários (Admin Only) */}
         {activeTab === 'users' && isAdmin && (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
-            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500">Gestão de Acessos</h3>
-              <button onClick={() => { setIsAddingUser(!isAddingUser); setEditingUser(null); }} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">{isAddingUser ? 'Fechar' : 'Novo Usuário'}</button>
-            </div>
-            
-            {(isAddingUser || editingUser) && (
-              <form className="p-6 space-y-4 bg-indigo-50/20" onSubmit={e => {
-                e.preventDefault();
-                if (editingUser) onEditUser(editingUser.email, newUserEmail, newUserRole);
-                else onAddUser(newUserEmail, newUserRole);
-                setNewUserEmail(''); setIsAddingUser(false); setEditingUser(null);
-              }}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input required type="email" placeholder="Email Gmail" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
-                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as UserRole)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold">
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+             <div className="p-6 bg-slate-50 dark:bg-slate-900/30 flex justify-between items-center">
+                <h3 className="font-bold text-sm uppercase text-slate-400">Usuários Autorizados</h3>
+                <button onClick={() => setFormUser({email: '', role: 'Convidado'})} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Autorizar Novo</button>
+             </div>
+             {(formUser) && (
+               <div className="p-6 bg-indigo-50/20 space-y-4">
+                  <input placeholder="E-mail Gmail" value={formUser.email} onChange={e => setFormUser({...formUser, email: e.target.value})} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900" />
+                  <select value={formUser.role} onChange={e => setFormUser({...formUser, role: e.target.value as UserRole})} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 font-bold">
                     <option value="Admin">Admin</option>
                     <option value="Financeiro">Financeiro</option>
                     <option value="Convidado">Convidado</option>
                   </select>
-                </div>
-                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">{editingUser ? 'Confirmar Alterações' : 'Autorizar E-mail'}</button>
-              </form>
-            )}
-
-            <div className="p-6 space-y-3">
-               {authorizedUsers.map(u => (
-                 <div key={u.email} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border dark:border-slate-700 transition-all hover:border-indigo-300">
-                   <div>
-                     <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{u.email}</div>
-                     <div className="text-[9px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded inline-block font-black uppercase tracking-widest mt-1">{u.role}</div>
-                   </div>
-                   <div className="flex gap-2">
-                      <button onClick={() => { setEditingUser(u); setNewUserEmail(u.email); setNewUserRole(u.role); setIsAddingUser(false); }} className="p-2 text-slate-400 hover:text-indigo-600"><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
-                      <button onClick={() => confirm("Excluir acesso de " + u.email + "?") && onDeleteUser(u.email)} className="p-2 text-slate-400 hover:text-rose-600"><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
-                   </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setFormUser(null)} className="flex-1 py-3 bg-slate-200 text-slate-600 rounded-xl font-bold">Cancelar</button>
+                    <button onClick={() => {
+                        if (formUser.oldEmail) onEditUser(formUser.oldEmail, formUser.email, formUser.role);
+                        else onAddUser(formUser.email, formUser.role);
+                        setFormUser(null);
+                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold">Confirmar</button>
+                  </div>
+               </div>
+             )}
+             {authorizedUsers.map(u => (
+               <div key={u.email} className="p-6 flex items-center justify-between">
+                 <div>
+                   <div className="text-sm font-bold">{u.email}</div>
+                   <div className="text-[9px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 px-2 rounded-md font-black uppercase mt-1 inline-block">{u.role}</div>
                  </div>
-               ))}
-            </div>
+                 <div className="flex gap-3">
+                   <button onClick={() => setFormUser({oldEmail: u.email, email: u.email, role: u.role})} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
+                   <button onClick={() => confirm(`Excluir ${u.email}?`) && onDeleteUser(u.email)} className="p-2 text-slate-400 hover:text-rose-600"><TrashIcon /></button>
+                 </div>
+               </div>
+             ))}
           </div>
         )}
 
-        {/* Tab: Descrições (Admin & Financeiro) */}
         {activeTab === 'desc' && (isAdmin || isFinanceiro) && (
-          <div className="p-6 space-y-6 animate-fade-in">
-              <h3 className="font-bold text-sm uppercase tracking-widest text-slate-500 mb-4">Descrições Rápidas (Max 4)</h3>
+          <div className="p-6 space-y-6">
+              <h3 className="font-bold text-sm uppercase text-slate-400">Descrições Rápidas (Até 4)</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[0, 1, 2, 3].map(i => (
                   <div key={i}>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Atalho {i + 1}</label>
-                    <input value={settings.readyDescriptions[i] || ""} onChange={e => handleUpdateDescription(i, e.target.value)} placeholder="Ex: Compra Insumos" className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Opção {i + 1}</label>
+                    <input 
+                      value={settings.readyDescriptions[i] || ""} 
+                      onChange={e => {
+                        const newDescs = [...settings.readyDescriptions];
+                        newDescs[i] = e.target.value;
+                        onUpdateSettings({...settings, readyDescriptions: newDescs});
+                      }} 
+                      placeholder="Ex: Compra Bebidas" 
+                      className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none"
+                    />
                   </div>
                 ))}
               </div>
           </div>
         )}
 
-        {/* Tab: Preferências */}
         {activeTab === 'pref' && (
-          <div className="p-6 space-y-1 animate-fade-in">
+          <div className="p-6 space-y-1">
              <Toggle label="Modo Escuro" checked={darkMode} onChange={setDarkMode} />
-             <Toggle label="Exibir Mural de Anotações" checked={settings.showNotes} onChange={v => handleUpdatePreference('showNotes', v)} />
-             <Toggle label="Exibir Assistente Financeiro IA" checked={settings.showAI} onChange={v => handleUpdatePreference('showAI', v)} />
-             <Toggle label="Exibir Gráfico de Tendência" checked={settings.showChart} onChange={v => handleUpdatePreference('showChart', v)} />
-             <Toggle label="Notificações em Segundo Plano" checked={settings.pushNotifications} onChange={v => handleUpdatePreference('pushNotifications', v)} />
-             <Toggle label="Relatório Semanal Automático" checked={settings.weeklyEmailSummary} onChange={v => handleUpdatePreference('weeklyEmailSummary', v)} />
+             <Toggle label="Exibir Mural de Anotações" checked={settings.showNotes} onChange={v => onUpdateSettings({...settings, showNotes: v})} />
+             <Toggle label="Exibir Assistente IA" checked={settings.showAI} onChange={v => onUpdateSettings({...settings, showAI: v})} />
+             <Toggle label="Exibir Gráfico de Curva" checked={settings.showChart} onChange={v => onUpdateSettings({...settings, showChart: v})} />
+             <Toggle label="Notificações Push" checked={settings.pushNotifications} onChange={v => onUpdateSettings({...settings, pushNotifications: v})} />
+             <Toggle label="Resumo Semanal por E-mail" checked={settings.weeklyEmailSummary} onChange={v => onUpdateSettings({...settings, weeklyEmailSummary: v})} />
           </div>
         )}
       </div>

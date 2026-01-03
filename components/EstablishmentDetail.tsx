@@ -1,4 +1,6 @@
 
+// Added React, useState, and useMemo imports to fix "Cannot find name" errors
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Added UserRole to imports
 import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';

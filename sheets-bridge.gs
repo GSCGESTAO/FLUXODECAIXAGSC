@@ -1,7 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.4
- * RBAC e Gestão Avançada de Usuários
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.5
  */
 
 function doGet(e) {
@@ -11,11 +10,10 @@ function doGet(e) {
   const establishments = estSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), name: String(row[1]), responsibleEmail: String(row[2]) }));
 
   const userSheet = ss.getSheetByName("Usuarios") || ss.insertSheet("Usuarios");
-  const authorizedUsers = userSheet.getDataRange().getValues().slice(1).filter(row => row[1] && String(row[1]).includes("@")).map(row => ({ email: String(row[1]).toLowerCase().trim(), role: String(row[2]) || 'Convidado' }));
+  const authorizedUsers = userSheet.getDataRange().getValues().slice(1).filter(row => row[1]).map(row => ({ email: String(row[1]).toLowerCase().trim(), role: String(row[2]) || 'Convidado' }));
 
   const transSheet = ss.getSheetByName("Transacoes") || ss.insertSheet("Transacoes");
-  const transValues = transSheet.getDataRange().getValues();
-  const transactions = transValues.length > 1 ? transValues.slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse() : [];
+  const transactions = transSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse();
 
   const notesSheet = ss.getSheetByName("Anotacoes") || ss.insertSheet("Anotacoes");
   const notesMap = {};
@@ -37,39 +35,42 @@ function doPost(e) {
 
     if (action === 'ADD_TRANSACTION') {
       ss.getSheetByName("Transacoes").appendRow([payload.id, payload.date, payload.timestamp, payload.establishmentId, payload.type, payload.amount, payload.description, payload.observations || "", payload.status, payload.user]);
-      logActivity(ss, user, "ADD_TRANSACTION", `Valor: ${payload.amount}`);
     } 
-    else if (action === 'EDIT_TRANSACTION') {
-      const sheet = ss.getSheetByName("Transacoes");
+    else if (action === 'EDIT_ESTABLISHMENT') {
+      const sheet = ss.getSheetByName("Estabelecimentos");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === payload.id) { sheet.getRange(i + 1, 1, 1, 10).setValues([[payload.id, payload.date, payload.timestamp, payload.establishmentId, payload.type, payload.amount, payload.description, payload.observations || "", payload.status, payload.user]]); break; }
+        if (String(data[i][0]) === payload.id) {
+          sheet.getRange(i + 1, 1, 1, 3).setValues([[payload.id, payload.name, payload.responsibleEmail]]);
+          break;
+        }
       }
-      logActivity(ss, user, "EDIT_TRANSACTION", `ID: ${payload.id}`);
+    }
+    else if (action === 'ADD_ESTABLISHMENT') {
+      ss.getSheetByName("Estabelecimentos").appendRow([payload.id, payload.name, payload.responsibleEmail]);
     }
     else if (action === 'ADD_USER') {
-      const sheet = ss.getSheetByName("Usuarios") || ss.insertSheet("Usuarios");
-      sheet.appendRow([Utilities.getUuid(), payload.email.toLowerCase().trim(), payload.role]);
-      logActivity(ss, user, "ADD_USER", `E-mail: ${payload.email}`);
+      ss.getSheetByName("Usuarios").appendRow([Utilities.getUuid(), payload.email.toLowerCase().trim(), payload.role]);
     }
     else if (action === 'EDIT_USER') {
       const sheet = ss.getSheetByName("Usuarios");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) { // Usando o email antigo como ID de busca
+        if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) {
           sheet.getRange(i + 1, 2, 1, 2).setValues([[payload.email.toLowerCase().trim(), payload.role]]);
           break;
         }
       }
-      logActivity(ss, user, "EDIT_USER", `Para: ${payload.email}`);
     }
     else if (action === 'DELETE_USER') {
       const sheet = ss.getSheetByName("Usuarios");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) { sheet.deleteRow(i + 1); break; }
+        if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) {
+          sheet.deleteRow(i + 1);
+          break;
+        }
       }
-      logActivity(ss, user, "DELETE_USER", `E-mail: ${payload.id}`);
     }
     else if (action === 'UPDATE_SETTINGS') {
       const sheet = ss.getSheetByName("Configuracoes") || ss.insertSheet("Configuracoes");
@@ -83,6 +84,7 @@ function doPost(e) {
       if (!found) sheet.appendRow([payload.entityId || "GENERAL", payload.notes]);
     }
 
+    logActivity(ss, user, action, "OK");
     return ContentService.createTextOutput(JSON.stringify({ "status": "success" })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": err.toString() })).setMimeType(ContentService.MimeType.JSON);
