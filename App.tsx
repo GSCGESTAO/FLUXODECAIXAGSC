@@ -23,22 +23,13 @@ const App: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('gsc_pending_transactions');
-    const pending = saved ? JSON.parse(saved) : [];
-    return [...pending, ...MOCK_TRANSACTIONS];
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [generalNotes, setGeneralNotes] = useState<string>(localStorage.getItem('gsc_general_notes') || '');
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
-
-  // Salva transações não sincronizadas no localStorage para persistência offline
-  useEffect(() => {
-    const pending = transactions.filter(t => t.isSynced === false);
-    localStorage.setItem('gsc_pending_transactions', JSON.stringify(pending));
-  }, [transactions]);
 
   const syncData = useCallback(async () => {
     if (!SHEET_API_URL) {
@@ -50,42 +41,22 @@ const App: React.FC = () => {
     setSyncError(false);
     
     try {
-      // 1. FORÇAR ENVIO (PUSH)
-      // Tenta enviar transações que ainda não foram sincronizadas
+      // 1. PUSH PENDING DATA
       const pendingTransactions = transactions.filter(t => t.isSynced === false);
-      if (pendingTransactions.length > 0) {
-        console.log(`Sincronizando ${pendingTransactions.length} transações pendentes...`);
-        for (const t of pendingTransactions) {
-          try {
-            const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
-            if (success) {
-              setTransactions(prev => prev.map(item => item.id === t.id ? { ...item, isSynced: true } : item));
-            }
-          } catch (e) {
-            console.error(`Falha ao enviar transação ${t.id}:`, e);
-          }
-        }
+      for (const t of pendingTransactions) {
+        await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
       }
 
-      // 2. RECEBER DADOS (PULL)
+      // 2. FETCH LATEST DATA
       const data = await fetchSheetData(SHEET_API_URL);
       if (data) {
         setEstablishments(data.establishments);
-        
-        // Combina transações da planilha com as locais que ainda não foram sincronizadas
-        const remoteTransactions = data.transactions.map(t => ({ ...t, isSynced: true }));
-        const localPending = transactions.filter(t => t.isSynced === false);
-        
-        // Remove duplicatas (caso uma transação tenha acabado de ser sincronizada e já esteja no remote)
-        const combined = [...localPending];
-        remoteTransactions.forEach(rt => {
-           if (!combined.some(ct => ct.id === rt.id)) {
-             combined.push(rt);
-           }
-        });
-
-        setTransactions(combined);
+        setTransactions(data.transactions.map(t => ({ ...t, isSynced: true })));
         setAuthorizedUsers(data.authorizedUsers);
+        
+        // Se houver uma nota vinda do servidor, poderíamos carregar aqui
+        // Por ora, mantemos local e apenas enviamos ao salvar
+        
         setLastSync(new Date());
         
         if (user) {
@@ -95,15 +66,11 @@ const App: React.FC = () => {
           );
           setIsAuthorized(isUserInList);
         }
-      } else {
-        throw new Error("Dados retornados da planilha são inválidos");
       }
     } catch (err) {
       console.error("Erro no sync:", err);
       setSyncError(true);
-      if (lastSync === null) {
-        setIsAuthorized(true);
-      }
+      if (lastSync === null) setIsAuthorized(true);
     } finally {
       setIsSyncing(false);
     }
@@ -144,8 +111,25 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateTransaction = (updatedTransaction: Transaction) => {
-    setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+  const handleUpdateTransaction = async (updatedTransaction: Transaction) => {
+    // Atualiza localmente
+    setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...updatedTransaction, isSynced: false } : t));
+    
+    // Envia para a planilha
+    if (SHEET_API_URL) {
+      const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', updatedTransaction);
+      if (success) {
+        setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...t, isSynced: true } : t));
+      }
+    }
+  };
+
+  const handleSaveNote = async (note: string) => {
+    setGeneralNotes(note);
+    localStorage.setItem('gsc_general_notes', note);
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { note, user: user?.email });
+    }
   };
 
   const handleAddEstablishment = async (establishment: Establishment) => {
@@ -166,7 +150,6 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
         <h2 className="text-xl font-bold text-slate-800 dark:text-white">Verificando Credenciais</h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">Isso pode levar alguns segundos na primeira vez...</p>
       </div>
     );
   }
@@ -188,7 +171,7 @@ const App: React.FC = () => {
         pendingCount={transactions.filter(t => !t.isSynced).length}
       >
         <Routes>
-          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} />} />
+          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={generalNotes} onSaveNote={handleSaveNote} />} />
           <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} />} />
           <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
           <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />

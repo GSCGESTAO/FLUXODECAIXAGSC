@@ -139,40 +139,42 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-800 rounded-xl p-5 border border-indigo-100 dark:border-slate-700 shadow-sm transition-colors">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors relative">
+        <div className="flex items-center gap-2 mb-4">
             <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg">
                 <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
             </div>
-            <h3 className="font-semibold text-indigo-900 dark:text-indigo-100">Pergunte à IA</h3>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 tracking-tight">Assistente IA</h3>
         </div>
         
-        <form onSubmit={handleAskAI} className="relative">
+        <form onSubmit={handleAskAI} className="relative group">
             <input 
                 type="text" 
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder='Ex: "Lançar 150 reais de compra de mercado"'
-                className="w-full p-3 pr-24 rounded-lg border border-indigo-200 dark:border-slate-600 focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400"
+                className="w-full p-3 pr-32 rounded-2xl border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 shadow-sm transition-all"
             />
             <button 
                 type="submit"
                 disabled={loadingAi || !question.trim()}
-                className="absolute right-1.5 top-1.5 bottom-1.5 bg-indigo-600 text-white px-3 rounded-md text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                className="absolute right-1.5 top-1.5 bottom-1.5 bg-[#3f45a1] dark:bg-[#4f55c1] text-white px-5 rounded-xl text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center min-w-[90px]"
             >
-                {loadingAi ? '...' : 'Enviar'}
+                {loadingAi ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : 'Analisar'}
             </button>
         </form>
 
         {aiResponse && (
           <div className="mt-4 space-y-3 animate-fade-in">
-            <div className="p-3 bg-white dark:bg-slate-900/50 rounded-lg border border-indigo-50 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm leading-relaxed shadow-sm">
+            <div className="p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-indigo-50 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm leading-relaxed shadow-sm">
               <span className="font-semibold text-indigo-600 dark:text-indigo-400 block mb-1">Resposta:</span>
               {aiResponse.answer}
             </div>
 
             {aiResponse.suggestedTransaction && (
-              <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-lg animate-fade-in shadow-inner">
+              <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl animate-fade-in shadow-inner">
                  <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
                    Sugerido: <strong>{aiResponse.suggestedTransaction.description}</strong> ({CURRENCY_FORMATTER.format(aiResponse.suggestedTransaction.amount)})
                  </div>
@@ -180,7 +182,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                   onClick={() => openSuggestedTransaction(aiResponse.suggestedTransaction!)}
                   className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-bold hover:bg-emerald-700 shadow-sm"
                  >
-                   Preencher Lançamento
+                   Preencher
                  </button>
               </div>
             )}
@@ -200,7 +202,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                   <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${t.type === TransactionType.ENTRADA ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                   <div>
                     <div className="font-medium text-slate-800 dark:text-slate-200">{t.description}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{new Date(t.date).toLocaleDateString('pt-BR')} • {t.user.split('@')[0]}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR')} • {t.user.split('@')[0]}</div>
                   </div>
                 </div>
                 
