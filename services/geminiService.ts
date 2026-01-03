@@ -2,7 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TransactionType } from "../types";
 
-const TEXT_MODEL = 'gemini-3-pro-preview';
+// Models selected based on complexity guidelines
+const FLASH_MODEL = 'gemini-3-flash-preview';
+const PRO_MODEL = 'gemini-3-pro-preview';
 
 export interface AiAssistantResponse {
   answer: string;
@@ -16,6 +18,7 @@ export interface AiAssistantResponse {
 
 /**
  * Suggests descriptions based on establishment and transaction type.
+ * Uses gemini-3-flash-preview for basic text tasks.
  */
 export const getSmartSuggestions = async (
   establishmentName: string,
@@ -35,8 +38,9 @@ export const getSmartSuggestions = async (
       Exemplo: ["Pagamento Fornecedor", "Compra Bebidas", "Manutenção", "Vale Transporte", "Enxoval"]
     `;
 
+    // Fix: Using gemini-3-flash-preview for simple text tasks like description suggestions
     const response = await ai.models.generateContent({
-      model: TEXT_MODEL,
+      model: FLASH_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -58,6 +62,7 @@ export const getSmartSuggestions = async (
 
 /**
  * Checks for anomalies in the transaction.
+ * Uses gemini-3-pro-preview for complex reasoning tasks.
  */
 export const checkAnomaly = async (
   establishmentName: string,
@@ -79,8 +84,9 @@ export const checkAnomaly = async (
       Se o valor for muito alto ou muito baixo para o contexto, marque como anômalo.
     `;
 
+    // Fix: Using gemini-3-pro-preview for advanced reasoning (anomaly detection)
     const response = await ai.models.generateContent({
-      model: TEXT_MODEL,
+      model: PRO_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -110,6 +116,7 @@ export const checkAnomaly = async (
 
 /**
  * Answers questions and potentially suggests transaction logging.
+ * Uses gemini-3-pro-preview for complex data extraction and reasoning.
  */
 export const askFinancialAssistant = async (
   establishmentName: string,
@@ -157,8 +164,9 @@ export const askFinancialAssistant = async (
       }
     `;
 
+    // Fix: Using gemini-3-pro-preview for complex multi-task extraction and financial reasoning
     const response = await ai.models.generateContent({
-      model: TEXT_MODEL,
+      model: PRO_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
