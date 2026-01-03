@@ -26,6 +26,7 @@ export const getSmartSuggestions = async (
   currentInput: string
 ): Promise<string[]> => {
   try {
+    // Fixed: Using process.env.API_KEY as required by the library guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
@@ -38,7 +39,6 @@ export const getSmartSuggestions = async (
       Exemplo: ["Pagamento Fornecedor", "Compra Bebidas", "Manutenção", "Vale Transporte", "Enxoval"]
     `;
 
-    // Fix: Using gemini-3-flash-preview for simple text tasks like description suggestions
     const response = await ai.models.generateContent({
       model: FLASH_MODEL,
       contents: prompt,
@@ -71,6 +71,7 @@ export const checkAnomaly = async (
   description: string
 ): Promise<{ isAnomalous: boolean; reason: string }> => {
   try {
+    // Fixed: Using process.env.API_KEY as required by the library guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const prompt = `
@@ -84,7 +85,6 @@ export const checkAnomaly = async (
       Se o valor for muito alto ou muito baixo para o contexto, marque como anômalo.
     `;
 
-    // Fix: Using gemini-3-pro-preview for advanced reasoning (anomaly detection)
     const response = await ai.models.generateContent({
       model: PRO_MODEL,
       contents: prompt,
@@ -125,6 +125,7 @@ export const askFinancialAssistant = async (
   question: string
 ): Promise<AiAssistantResponse> => {
   try {
+    // Fixed: Using process.env.API_KEY as required by the library guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const recentTransactions = transactions.slice(0, 100);
     
@@ -164,7 +165,6 @@ export const askFinancialAssistant = async (
       }
     `;
 
-    // Fix: Using gemini-3-pro-preview for complex multi-task extraction and financial reasoning
     const response = await ai.models.generateContent({
       model: PRO_MODEL,
       contents: prompt,
