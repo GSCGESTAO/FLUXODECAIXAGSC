@@ -1,80 +1,53 @@
 
 import React, { useState } from 'react';
-import { Establishment } from '../types';
+import { Establishment, AuthorizedUser, AppSettings } from '../types';
 
 interface SettingsProps {
   establishments: Establishment[];
+  authorizedUsers: AuthorizedUser[];
   onAddEstablishment: (est: Establishment) => void;
   onUpdateEstablishment: (est: Establishment) => void;
+  onAddUser: (email: string) => void;
   darkMode: boolean;
   setDarkMode: (value: boolean) => void;
+  settings: AppSettings;
+  onUpdateSettings: (newSettings: AppSettings) => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
   establishments, 
+  authorizedUsers,
   onAddEstablishment, 
   onUpdateEstablishment,
+  onAddUser,
   darkMode, 
-  setDarkMode
+  setDarkMode,
+  settings,
+  onUpdateSettings
 }) => {
-  // Add State
-  const [isAdding, setIsAdding] = useState(false);
+  const [activeTab, setActiveTab] = useState<'estab' | 'desc' | 'users' | 'pref'>('estab');
+  
+  // Establishment States
+  const [isAddingEst, setIsAddingEst] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
 
-  // Edit State
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
+  // User State
+  const [newUserEmail, setNewUserEmail] = useState('');
 
-  // Preferences State
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState(true);
-  const [currency, setCurrency] = useState('BRL');
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newEmail) return;
-
-    const newEst: Establishment = {
-      id: crypto.randomUUID(),
-      name: newName,
-      responsibleEmail: newEmail
-    };
-
-    onAddEstablishment(newEst);
-    setNewName('');
-    setNewEmail('');
-    setIsAdding(false);
+  const handleUpdatePreference = (key: keyof AppSettings, value: any) => {
+    onUpdateSettings({ ...settings, [key]: value });
   };
 
-  const handleStartEdit = (est: Establishment) => {
-    setEditingId(est.id);
-    setEditName(est.name);
-    setEditEmail(est.responsibleEmail);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingId && editName && editEmail) {
-        onUpdateEstablishment({
-            id: editingId,
-            name: editName,
-            responsibleEmail: editEmail
-        });
-        setEditingId(null);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditName('');
-    setEditEmail('');
+  const handleUpdateDescription = (index: number, value: string) => {
+    const newDescs = [...settings.readyDescriptions];
+    newDescs[index] = value;
+    handleUpdatePreference('readyDescriptions', newDescs);
   };
 
   const Toggle = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (v: boolean) => void }) => (
-    <div className="flex justify-between items-center py-3">
-      <span className="text-sm text-slate-700 dark:text-slate-300">{label}</span>
+    <div className="flex justify-between items-center py-4 border-b border-slate-100 dark:border-slate-700 last:border-0">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       <button 
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
@@ -85,145 +58,127 @@ export const Settings: React.FC<SettingsProps> = ({
   );
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Ajustes</h2>
+    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+      <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Ajustes do Sistema</h2>
 
-      {/* Establishment Management */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-          <h3 className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-            Meus Estabelecimentos
-          </h3>
-          <button 
-            onClick={() => setIsAdding(!isAdding)}
-            className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+      {/* Tabs Navigation */}
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl overflow-x-auto scrollbar-hide">
+        {[
+          { id: 'estab', label: 'Estabelecimentos' },
+          { id: 'desc', label: 'Descrições' },
+          { id: 'users', label: 'Usuários' },
+          { id: 'pref', label: 'Preferências' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
           >
-            {isAdding ? 'Cancelar' : 'Adicionar Novo'}
+            {tab.label}
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Add Form */}
-        {isAdding && (
-          <form onSubmit={handleAdd} className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800 animate-fade-in">
-            <div className="grid gap-3">
-               <input 
-                 type="text" 
-                 placeholder="Nome do Estabelecimento" 
-                 className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 outline-none focus:border-indigo-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400"
-                 value={newName}
-                 onChange={e => setNewName(e.target.value)}
-                 required
-               />
-               <input 
-                 type="email" 
-                 placeholder="Email do Gerente" 
-                 className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 outline-none focus:border-indigo-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400"
-                 value={newEmail}
-                 onChange={e => setNewEmail(e.target.value)}
-                 required
-               />
-               <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">
-                 Salvar Estabelecimento
-               </button>
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
+        
+        {/* Tab: Estabelecimentos */}
+        {activeTab === 'estab' && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-700 dark:text-slate-200">Unidades Ativas</h3>
+              <button onClick={() => setIsAddingEst(!isAddingEst)} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700">{isAddingEst ? 'Fechar' : 'Nova Unidade'}</button>
             </div>
-          </form>
+            {isAddingEst && (
+              <form className="p-6 space-y-3 bg-indigo-50/30 dark:bg-indigo-900/10" onSubmit={e => {
+                e.preventDefault();
+                onAddEstablishment({ id: crypto.randomUUID(), name: newName, responsibleEmail: newEmail });
+                setNewName(''); setNewEmail(''); setIsAddingEst(false);
+              }}>
+                <input required placeholder="Nome do Restaurante" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
+                <input required type="email" placeholder="Email do Gerente" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" />
+                <button className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">Cadastrar</button>
+              </form>
+            )}
+            {establishments.map(est => (
+              <div key={est.id} className="p-6 flex justify-between items-center">
+                <div>
+                  <div className="font-bold text-slate-800 dark:text-white">{est.name}</div>
+                  <div className="text-xs text-slate-400 font-medium">{est.responsibleEmail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
-        {/* List */}
-        <div className="divide-y divide-slate-100 dark:divide-slate-700">
-          {establishments.map(est => (
-            <div key={est.id} className="p-4 flex flex-col sm:flex-row justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors gap-3">
-              {editingId === est.id ? (
-                <div className="w-full flex flex-col sm:flex-row gap-2 items-center animate-fade-in">
-                    <div className="flex-1 w-full grid gap-2">
-                        <input 
-                            type="text" 
-                            value={editName} 
-                            onChange={e => setEditName(e.target.value)}
-                            className="w-full p-1.5 border border-indigo-300 dark:border-indigo-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm"
-                            placeholder="Nome"
-                        />
-                        <input 
-                            type="text" 
-                            value={editEmail} 
-                            onChange={e => setEditEmail(e.target.value)}
-                            className="w-full p-1.5 border border-indigo-300 dark:border-indigo-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs"
-                            placeholder="Email"
-                        />
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={handleSaveEdit} className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                        </button>
-                        <button onClick={handleCancelEdit} className="p-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600">
-                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center sm:text-left">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">{est.name}</div>
-                    <div className="text-xs text-slate-400">{est.responsibleEmail}</div>
+        {/* Tab: Descrições Prontas */}
+        {activeTab === 'desc' && (
+          <div className="p-6 space-y-6 animate-fade-in">
+            <div>
+              <h3 className="font-bold text-slate-800 dark:text-white mb-2">Descrições Rápidas (Até 4)</h3>
+              <p className="text-xs text-slate-500 mb-6">Estas descrições aparecerão como botões de atalho na tela de novo lançamento.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[0, 1, 2, 3].map(i => (
+                  <div key={i} className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Opção {i + 1}</label>
+                    <input 
+                      value={settings.readyDescriptions[i] || ""} 
+                      onChange={e => handleUpdateDescription(i, e.target.value)}
+                      placeholder="Ex: Compra Bebidas" 
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    />
                   </div>
-                  <button onClick={() => handleStartEdit(est)} className="text-slate-300 dark:text-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 p-2 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Preferences Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* General Preferences */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 transition-colors">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Geral
-            </h3>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                <Toggle label="Modo Escuro" checked={darkMode} onChange={setDarkMode} />
-                <div className="flex justify-between items-center py-3">
-                    <span className="text-sm text-slate-700 dark:text-slate-300">Moeda Padrão</span>
-                    <select 
-                        value={currency} 
-                        onChange={e => setCurrency(e.target.value)}
-                        className="text-sm border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-white outline-none"
-                    >
-                        <option value="BRL">BRL (R$)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                    </select>
-                </div>
-                <div className="flex justify-between items-center py-3">
-                    <span className="text-sm text-slate-700 dark:text-slate-300">Idioma</span>
-                    <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Português (BR)</span>
-                </div>
+                ))}
+              </div>
             </div>
           </div>
+        )}
 
-          {/* AI & Notifications */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 transition-colors">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                Inteligência & Notificações
-            </h3>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                <Toggle label="Sugestões Automáticas (IA)" checked={aiSuggestions} onChange={setAiSuggestions} />
-                <Toggle label="Alertas de Anomalia" checked={true} onChange={() => {}} />
-                <Toggle label="Resumo Semanal por E-mail" checked={emailNotifications} onChange={setEmailNotifications} />
-                <Toggle label="Notificações Push" checked={pushNotifications} onChange={setPushNotifications} />
-            </div>
+        {/* Tab: Usuários */}
+        {activeTab === 'users' && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700 animate-fade-in">
+             <div className="p-6">
+               <h3 className="font-bold text-slate-800 dark:text-white mb-4">Autorizar Novo E-mail</h3>
+               <div className="flex gap-2">
+                 <input 
+                  type="email" 
+                  value={newUserEmail} 
+                  onChange={e => setNewUserEmail(e.target.value)}
+                  placeholder="email@gmail.com" 
+                  className="flex-1 p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm" 
+                 />
+                 <button 
+                  onClick={() => { if(newUserEmail) { onAddUser(newUserEmail); setNewUserEmail(""); } }}
+                  className="bg-indigo-600 text-white px-6 rounded-xl font-bold text-xs"
+                 >Adicionar</button>
+               </div>
+             </div>
+             <div className="p-6 space-y-4">
+               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Usuários com Acesso</h4>
+               {authorizedUsers.map(u => (
+                 <div key={u.email} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
+                   <div className="text-sm font-medium text-slate-700 dark:text-slate-300">{u.email}</div>
+                   <div className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 px-2 py-1 rounded-md font-bold uppercase">{u.role}</div>
+                 </div>
+               ))}
+             </div>
           </div>
+        )}
+
+        {/* Tab: Preferências (Toggles) */}
+        {activeTab === 'pref' && (
+          <div className="p-6 space-y-1 animate-fade-in">
+             <Toggle label="Modo Escuro" checked={darkMode} onChange={setDarkMode} />
+             <Toggle label="Exibir Mural de Anotações" checked={settings.showNotes} onChange={v => handleUpdatePreference('showNotes', v)} />
+             <Toggle label="Exibir Assistente Financeiro IA" checked={settings.showAI} onChange={v => handleUpdatePreference('showAI', v)} />
+             <Toggle label="Exibir Gráfico de Tendência (Curva)" checked={settings.showChart} onChange={v => handleUpdatePreference('showChart', v)} />
+             <Toggle label="Notificações de Lançamentos (Navegador)" checked={settings.pushNotifications} onChange={v => handleUpdatePreference('pushNotifications', v)} />
+             <Toggle label="Resumo Semanal para Email do Gerente" checked={settings.weeklyEmailSummary} onChange={v => handleUpdatePreference('weeklyEmailSummary', v)} />
+          </div>
+        )}
       </div>
-      
-      <div className="text-center text-xs text-slate-400 mt-8">
-        ID do Usuário: user_88293 • Build: 2024.10.15
+
+      <div className="text-center">
+         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Fluxo GSC v1.6 Cloud</p>
       </div>
     </div>
   );

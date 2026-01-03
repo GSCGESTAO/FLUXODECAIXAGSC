@@ -1,5 +1,5 @@
 
-import { Transaction, Establishment, AuthorizedUser } from "../types";
+import { Transaction, Establishment, AuthorizedUser, AppSettings } from "../types";
 
 /**
  * Busca todos os dados (Estabelecimentos, Transações e Usuários Autorizados)
@@ -8,7 +8,8 @@ export const fetchSheetData = async (url: string): Promise<{
   establishments: Establishment[], 
   transactions: Transaction[],
   authorizedUsers: AuthorizedUser[],
-  notes?: string
+  notes?: Record<string, string>,
+  settings?: AppSettings
 } | null> => {
   try {
     const response = await fetch(`${url}?t=${Date.now()}`);
@@ -17,10 +18,12 @@ export const fetchSheetData = async (url: string): Promise<{
     const data = await response.json();
     
     if (data && Array.isArray(data.establishments)) {
+      // Fix: Added settings to the returned object from sheet data
       return {
         establishments: data.establishments,
         authorizedUsers: data.authorizedUsers || [],
-        notes: data.notes || '',
+        notes: data.notes || {},
+        settings: data.settings,
         transactions: (data.transactions || []).map((t: any) => ({
           ...t,
           amount: parseFloat(t.amount) || 0,

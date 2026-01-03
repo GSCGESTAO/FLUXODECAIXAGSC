@@ -11,7 +11,7 @@ import { Reports } from './components/Reports';
 import { Login } from './components/Login';
 import { AccessDenied } from './components/AccessDenied';
 import { MOCK_ESTABLISHMENTS, MOCK_TRANSACTIONS, SHEET_API_URL } from './constants';
-import { Transaction, Establishment, UserProfile, AuthorizedUser } from './types';
+import { Transaction, Establishment, UserProfile, AuthorizedUser, AppSettings } from './types';
 import { fetchSheetData, postToSheet } from './services/sheetService';
 
 const App: React.FC = () => {
@@ -26,17 +26,38 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('gsc_pending_transactions');
     const pending = saved ? JSON.parse(saved) : [];
-    // Only return mock data if there's no sheet URL and no pending
     return !SHEET_API_URL && pending.length === 0 ? MOCK_TRANSACTIONS : pending;
   });
-  const [notes, setNotes] = useState<string>(localStorage.getItem('gsc_notes') || '');
+  
+  const [notes, setNotes] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('gsc_notes_map');
+    return saved ? JSON.parse(saved) : { "GENERAL": "" };
+  });
+
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('gsc_settings');
+    return saved ? JSON.parse(saved) : {
+      readyDescriptions: [],
+      showNotes: true,
+      showAI: true,
+      showChart: true,
+      pushNotifications: false,
+      weeklyEmailSummary: true
+    };
+  });
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
 
-  // Salva transações não sincronizadas no localStorage para persistência offline
+  useEffect(() => {
+    localStorage.setItem('gsc_settings', JSON.stringify(settings));
+    if (settings.pushNotifications && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [settings]);
+
   useEffect(() => {
     const pending = transactions.filter(t => t.isSynced === false);
     localStorage.setItem('gsc_pending_transactions', JSON.stringify(pending));
@@ -52,12 +73,11 @@ const App: React.FC = () => {
     setSyncError(false);
     
     try {
-      // 1. FORÇAR ENVIO (PUSH)
       const pendingTransactions = transactions.filter(t => t.isSynced === false);
       if (pendingTransactions.length > 0) {
         for (const t of pendingTransactions) {
           try {
-            const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', t);
+            const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', { ...t, user: user?.email });
             if (success) {
               setTransactions(prev => prev.map(item => item.id === t.id ? { ...item, isSynced: true } : item));
             }
@@ -67,13 +87,15 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. RECEBER DADOS (PULL)
       const data = await fetchSheetData(SHEET_API_URL);
       if (data) {
         setEstablishments(data.establishments);
-        if (data.notes !== undefined) {
+        if (data.notes) {
           setNotes(data.notes);
-          localStorage.setItem('gsc_notes', data.notes);
+          localStorage.setItem('gsc_notes_map', JSON.stringify(data.notes));
+        }
+        if (data.settings) {
+          setSettings(prev => ({ ...prev, ...data.settings }));
         }
         
         const remoteTransactions = data.transactions.map(t => ({ ...t, isSynced: true }));
@@ -117,6 +139,12 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
 
+  const triggerNotification = (title: string, body: string) => {
+    if (settings.pushNotifications && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    }
+  };
+
   const handleLogin = (newUser: UserProfile) => {
     localStorage.setItem('gsc_user', JSON.stringify(newUser));
     setUser(newUser);
@@ -134,6 +162,9 @@ const App: React.FC = () => {
     const enriched = { ...transaction, user: user?.email || 'unknown', isSynced: false };
     setTransactions(prev => [enriched, ...prev]);
     
+    const estName = establishments.find(e => e.id === transaction.establishmentId)?.name || 'Restaurante';
+    triggerNotification('Novo Lançamento', `${enriched.type} de ${estName}: R$ ${enriched.amount.toFixed(2)}`);
+
     if (SHEET_API_URL) {
       const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', enriched);
       if (success) {
@@ -146,30 +177,50 @@ const App: React.FC = () => {
     setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...updatedTransaction, isSynced: false } : t));
     
     if (SHEET_API_URL) {
-      const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', updatedTransaction);
+      const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', { ...updatedTransaction, user: user?.email });
       if (success) {
         setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? { ...t, isSynced: true } : t));
       }
     }
   };
 
-  const handleSaveNote = async (newNote: string) => {
-    setNotes(newNote);
-    localStorage.setItem('gsc_notes', newNote);
+  const handleSaveNote = async (newNote: string, entityId: string = "GENERAL") => {
+    const updatedNotes = { ...notes, [entityId]: newNote };
+    setNotes(updatedNotes);
+    localStorage.setItem('gsc_notes_map', JSON.stringify(updatedNotes));
+    
     if (SHEET_API_URL) {
-      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { notes: newNote });
+      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { 
+        notes: newNote, 
+        entityId: entityId,
+        user: user?.email
+      });
     }
   };
 
   const handleAddEstablishment = async (establishment: Establishment) => {
     setEstablishments(prev => [...prev, establishment]);
     if (SHEET_API_URL) {
-      await postToSheet(SHEET_API_URL, 'ADD_ESTABLISHMENT', establishment);
+      await postToSheet(SHEET_API_URL, 'ADD_ESTABLISHMENT', { ...establishment, user: user?.email });
     }
   };
 
   const handleUpdateEstablishment = (updatedEstablishment: Establishment) => {
     setEstablishments(prev => prev.map(est => est.id === updatedEstablishment.id ? updatedEstablishment : est));
+  };
+
+  const handleUpdateSettings = async (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'UPDATE_SETTINGS', { settings: newSettings, user: user?.email });
+    }
+  };
+
+  const handleAddUser = async (email: string) => {
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'ADD_USER', { email, role: 'Operador', user: user?.email });
+      syncData();
+    }
   };
 
   if (!user) return <Login onLogin={handleLogin} />;
@@ -200,11 +251,11 @@ const App: React.FC = () => {
         pendingCount={transactions.filter(t => !t.isSynced).length}
       >
         <Routes>
-          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} />} />
-          <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} />} />
-          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
+          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} settings={settings} />} />
+          <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} settings={settings} />} />
+          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
           <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
-          <Route path="/settings" element={<Settings establishments={establishments} onAddEstablishment={handleAddEstablishment} onUpdateEstablishment={handleUpdateEstablishment} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/settings" element={<Settings establishments={establishments} authorizedUsers={authorizedUsers} onAddEstablishment={handleAddEstablishment} onUpdateEstablishment={handleUpdateEstablishment} onAddUser={handleAddUser} darkMode={darkMode} setDarkMode={setDarkMode} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="/reports" element={<Reports establishments={establishments} transactions={transactions} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

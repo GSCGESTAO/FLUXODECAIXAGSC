@@ -39,7 +39,16 @@ export interface Transaction {
   observations?: string;
   status: TransactionStatus;
   user: string;
-  isSynced?: boolean; // Novo campo para controle de sincronização
+  isSynced?: boolean;
+}
+
+export interface AppSettings {
+  readyDescriptions: string[];
+  showNotes: boolean;
+  showAI: boolean;
+  showChart: boolean;
+  pushNotifications: boolean;
+  weeklyEmailSummary: boolean;
 }
 
 export interface AnomalyCheckResult {
