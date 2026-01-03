@@ -1,6 +1,8 @@
 
+// Added React, useState, and useMemo imports to fix "Cannot find name" errors
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+// Added UserRole to imports
 import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
 import { askFinancialAssistant, AiAssistantResponse } from '../services/geminiService';
@@ -10,12 +12,15 @@ interface EstablishmentDetailProps {
   transactions: Transaction[];
   onUpdateTransaction: (t: Transaction) => void;
   settings: AppSettings;
+  // Added userRole to props interface
   userRole?: UserRole | null;
 }
 
+// Removed hardcoded IS_ADMIN constant
 export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establishments, transactions, onUpdateTransaction, settings, userRole }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Added isAdmin check based on userRole prop
   const isAdmin = userRole === 'Admin';
   const [question, setQuestion] = useState('');
   const [aiResponse, setAiResponse] = useState<AiAssistantResponse | null>(null);
@@ -69,35 +74,30 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400 uppercase font-bold tracking-widest">Saldo Atual</span>
-          <div className={`${balance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {balance >= 0 ? (
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"></path><path d="M17 6h6v6"></path></svg>
-            ) : (
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 18l-9.5-9.5-5 5L1 6"></path><path d="M17 18h6v-6"></path></svg>
-            )}
-          </div>
-        </div>
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm text-center">
+        <span className="text-xs text-slate-400 uppercase font-bold tracking-widest">Saldo do Estabelecimento</span>
         <div className={`text-4xl font-black mt-2 ${balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{CURRENCY_FORMATTER.format(balance)}</div>
       </div>
 
       {settings.showAI && (
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2 mb-4">
+              <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg"><svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg></div>
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">Assistente IA da Unidade</h3>
+          </div>
           <form onSubmit={handleAskAI} className="relative group">
-              <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder='Falar com assistente da unidade...' className="w-full p-4 pr-32 rounded-2xl border dark:border-slate-700 outline-none text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white" />
-              <button type="submit" disabled={loadingAi || !question.trim()} className="absolute right-1.5 top-1.5 bottom-1.5 bg-indigo-600 text-white px-5 rounded-xl text-xs font-bold uppercase">{loadingAi ? '...' : 'Analisar'}</button>
+              <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder='Pergunte algo sobre o financeiro desta casa...' className="w-full p-4 pr-32 rounded-2xl border dark:border-slate-700 outline-none text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white" />
+              <button type="submit" disabled={loadingAi || !question.trim()} className="absolute right-1.5 top-1.5 bottom-1.5 bg-indigo-600 text-white px-5 rounded-xl text-xs font-bold">{loadingAi ? '...' : 'Analisar'}</button>
           </form>
-          {aiResponse && <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl text-xs leading-relaxed">{aiResponse.answer}</div>}
+          {aiResponse && <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl text-sm leading-relaxed">{aiResponse.answer}</div>}
         </div>
       )}
 
       <div>
-        <h3 className="text-slate-700 dark:text-slate-300 font-bold text-xs uppercase tracking-widest mb-3 ml-1">Lançamentos Recentes</h3>
+        <h3 className="text-slate-700 dark:text-slate-300 font-bold text-sm uppercase tracking-widest mb-3">Movimentações</h3>
         <div className="space-y-2">
           {estTransactions.map(t => (
-            <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex justify-between items-center">
+            <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex justify-between items-center group">
               <div className="flex items-start gap-3">
                 <div className={`mt-1.5 w-1.5 h-1.5 rounded-full ${t.type === TransactionType.ENTRADA ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                 <div>
@@ -106,19 +106,9 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                  <div className={`font-black text-sm flex items-center gap-1 ${t.type === TransactionType.ENTRADA ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {t.type === TransactionType.ENTRADA ? (
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"></path><path d="M17 6h6v6"></path></svg>
-                    ) : (
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M23 18l-9.5-9.5-5 5L1 6"></path><path d="M17 18h6v-6"></path></svg>
-                    )}
-                    {CURRENCY_FORMATTER.format(t.amount)}
-                  </div>
-                  {isAdmin && <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600 transition-colors">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                    </svg>
-                  </button>}
+                  <div className={`font-black text-sm ${t.type === TransactionType.ENTRADA ? 'text-emerald-600' : 'text-rose-600'}`}>{t.type === TransactionType.ENTRADA ? '+' : '-'} {CURRENCY_FORMATTER.format(t.amount)}</div>
+                  {/* Used dynamic isAdmin instead of hardcoded IS_ADMIN */}
+                  {isAdmin && <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>}
               </div>
             </div>
           ))}
@@ -138,12 +128,12 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                     </div>
                 </div>
                 <div className="flex gap-3 mt-8">
-                    <button onClick={() => setEditingTransaction(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest">Descartar</button>
+                    <button onClick={() => setEditingTransaction(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest">Cancelar</button>
                     <button onClick={() => {
-                        if (parseInt(captchaInput) !== (captchaChallenge.a + captchaChallenge.b)) { alert("Cálculo incorreto!"); return; }
+                        if (parseInt(captchaInput) !== (captchaChallenge.a + captchaChallenge.b)) { alert("Erro no cálculo!"); return; }
                         onUpdateTransaction({ ...editingTransaction, amount: parseFloat(editFormAmount), description: editFormDesc });
                         setEditingTransaction(null);
-                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-md">Confirmar</button>
+                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-md">Salvar</button>
                 </div>
             </div>
         </div>
