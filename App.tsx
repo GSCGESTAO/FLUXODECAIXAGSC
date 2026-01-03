@@ -168,6 +168,8 @@ const App: React.FC = () => {
 
   const handleAddUser = async (email: string, role: UserRole) => {
     if (userRole !== 'Admin') return;
+    const newUser = { email, role };
+    setAuthorizedUsers(prev => [...prev, newUser]);
     if (SHEET_API_URL) {
       await postToSheet(SHEET_API_URL, 'ADD_USER', { email, role, user: user?.email });
       syncData();
@@ -176,6 +178,8 @@ const App: React.FC = () => {
 
   const handleEditUser = async (oldEmail: string, email: string, role: UserRole) => {
     if (userRole !== 'Admin') return;
+    // Atualização imediata do estado local para feedback visual
+    setAuthorizedUsers(prev => prev.map(u => u.email === oldEmail ? { email, role } : u));
     if (SHEET_API_URL) {
       await postToSheet(SHEET_API_URL, 'EDIT_USER', { id: oldEmail, email, role, user: user?.email });
       syncData();
@@ -184,6 +188,7 @@ const App: React.FC = () => {
 
   const handleDeleteUser = async (email: string) => {
     if (userRole !== 'Admin') return;
+    setAuthorizedUsers(prev => prev.filter(u => u.email !== email));
     if (SHEET_API_URL) {
       await postToSheet(SHEET_API_URL, 'DELETE_USER', { id: email, user: user?.email });
       syncData();

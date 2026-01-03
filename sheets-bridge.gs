@@ -1,6 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.5
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.6
  */
 
 function doGet(e) {
@@ -13,7 +13,7 @@ function doGet(e) {
   const authorizedUsers = userSheet.getDataRange().getValues().slice(1).filter(row => row[1]).map(row => ({ email: String(row[1]).toLowerCase().trim(), role: String(row[2]) || 'Convidado' }));
 
   const transSheet = ss.getSheetByName("Transacoes") || ss.insertSheet("Transacoes");
-  const transactions = transSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse();
+  const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse() : [];
 
   const notesSheet = ss.getSheetByName("Anotacoes") || ss.insertSheet("Anotacoes");
   const notesMap = {};
@@ -57,6 +57,7 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) {
+          // payload.id é o e-mail antigo, payload.email é o novo, payload.role é o cargo
           sheet.getRange(i + 1, 2, 1, 2).setValues([[payload.email.toLowerCase().trim(), payload.role]]);
           break;
         }

@@ -225,7 +225,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
             <button key={est.id} onClick={() => navigate(`/establishment/${est.id}`)} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all text-left group">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-bold text-slate-800 dark:text-white text-lg group-hover:text-indigo-600 transition-colors">{est.name}</h4>
-                <div className={`p-1.5 rounded-full ${balance >= 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{balance >= 0 ? '+' : '-'}</div>
+                <div className={`p-1.5 rounded-full ${balance >= 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                  {balance >= 0 ? (
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"></path><path d="M17 6h6v6"></path></svg>
+                  ) : (
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 18l-9.5-9.5-5 5L1 6"></path><path d="M17 18h6v-6"></path></svg>
+                  )}
+                </div>
               </div>
               <div className="text-2xl font-black text-slate-700 dark:text-slate-200">{CURRENCY_FORMATTER.format(balance)}</div>
             </button>
