@@ -26,8 +26,11 @@ const App: React.FC = () => {
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({ "GENERAL": "" });
+  
   const [settings, setSettings] = useState<AppSettings>({
     readyDescriptions: [],
+    groupAIds: [],
+    groupBIds: [],
     showNotes: true,
     showAI: true,
     showChart: true,
@@ -40,30 +43,17 @@ const App: React.FC = () => {
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
 
-  // Função para normalizar qualquer string de data para YYYY-MM-DD
   const normalizeDate = (raw: any): string => {
     if (!raw) return new Date().toISOString().split('T')[0];
     const s = String(raw).trim();
-    
-    // Formato Brasileiro DD/MM/AAAA
-    if (s.includes('/') && s.split('/').length >= 3) {
-      const parts = s.split(' ')[0].split('/');
-      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
-    
-    // Tenta converter strings longas ou ISO
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    const brMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
     const d = new Date(s);
     if (!isNaN(d.getTime())) {
-      // Ajuste para evitar que o fuso horário mude o dia (pega apenas a parte da data)
-      if (s.includes('T')) return s.split('T')[0];
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      // Se for uma data "meia noite" de sistema, o Date() pode retroceder um dia dependendo do fuso
-      // Mas para strings de sistema vindo do Google, d.toISOString() costuma ser o mais seguro
-      return `${year}-${month}-${day}`;
+      return d.toISOString().split('T')[0];
     }
-    
     return s;
   };
 
@@ -82,12 +72,20 @@ const App: React.FC = () => {
       if (data) {
         setEstablishments(data.establishments);
         if (data.notes) setNotes(data.notes);
-        if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+        if (data.settings) setSettings(prev => ({ 
+          ...prev, 
+          ...data.settings,
+          readyDescriptions: data.settings.readyDescriptions || [],
+          groupAIds: data.settings.groupAIds || [],
+          groupBIds: data.settings.groupBIds || []
+        }));
         
-        const remoteTransactions = data.transactions.map(t => ({
+        // Fix: Cast 't' to any because 'isEdited' might arrive as a boolean or a string ("TRUE"/"true") from the Google Sheets API.
+        const remoteTransactions = data.transactions.map((t: any) => ({
           ...t,
-          date: normalizeDate(t.date), // Normalização agressiva aqui
-          isSynced: true 
+          date: normalizeDate(t.date),
+          isSynced: true,
+          isEdited: t.isEdited === true || t.isEdited === 'TRUE' || t.isEdited === 'true'
         }));
 
         setTransactions(remoteTransactions);
@@ -133,35 +131,38 @@ const App: React.FC = () => {
 
   const handleUpdateTransaction = async (updated: Transaction) => {
     if (userRole === 'Convidado') return;
-    
     const item = { ...updated, isEdited: true, isSynced: false };
     setTransactions(prev => prev.map(t => t.id === item.id ? item : t));
-    
     if (SHEET_API_URL) {
       const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', { ...item, user: user?.email });
       if (success) await syncData();
     }
   };
 
+  const handleSaveTransaction = async (transaction: Transaction) => {
+    if (userRole === 'Convidado') return;
+    const item = { ...transaction, isSynced: false };
+    setTransactions(prev => [item, ...prev]);
+    if (SHEET_API_URL) {
+      const success = await postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', { ...item, user: user?.email });
+      if (success) await syncData();
+    }
+  };
+
+  const handleSaveNote = async (newNote: string, entityId: string = "GENERAL") => {
+    if (userRole === 'Convidado') return;
+    setNotes(prev => ({ ...prev, [entityId]: newNote }));
+    if (SHEET_API_URL) {
+      await postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { notes: newNote, entityId, user: user?.email });
+    }
+  };
+
   if (!user) return <Login onLogin={setUser} />;
   
-  if (syncError && isAuthorized === null) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
-          <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        </div>
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Conexão Offline</h2>
-        <p className="text-slate-500 text-sm mt-2 max-w-xs">Não conseguimos conectar com a base de dados GSC.</p>
-        <button onClick={syncData} className="mt-6 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold">Tentar Sincronizar</button>
-      </div>
-    );
-  }
-
   if (isAuthorized === null) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">GSC Cloud • Sincronizando</h2>
+      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tighter uppercase">GSC • Carregando Inteligência</h2>
     </div>
   );
   
@@ -171,10 +172,10 @@ const App: React.FC = () => {
     <HashRouter>
       <Layout darkMode={darkMode} isSyncing={isSyncing} lastSync={lastSync} onSync={syncData} syncError={syncError} user={user} onLogout={() => setUser(null)} userRole={userRole}>
         <Routes>
-          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={(n, e) => postToSheet(SHEET_API_URL, 'UPDATE_NOTE', { notes: n, entityId: e, user: user.email }).then(() => syncData())} settings={settings} userRole={userRole} />} />
+          <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} settings={settings} userRole={userRole} />} />
           <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} settings={settings} userRole={userRole} />} />
-          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={t => postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', { ...t, user: user.email }).then(() => syncData())} userEmail={user.email} settings={settings} />} />
-          <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={t => postToSheet(SHEET_API_URL, 'ADD_TRANSACTION', { ...t, user: user.email }).then(() => syncData())} userEmail={user.email} />} />
+          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
+          <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
           <Route path="/settings" element={<Settings establishments={establishments} authorizedUsers={authorizedUsers} onAddEstablishment={est => postToSheet(SHEET_API_URL, 'ADD_ESTABLISHMENT', { ...est, user: user.email }).then(() => syncData())} onUpdateEstablishment={est => postToSheet(SHEET_API_URL, 'EDIT_ESTABLISHMENT', { ...est, user: user.email }).then(() => syncData())} onAddUser={(e, r) => postToSheet(SHEET_API_URL, 'ADD_USER', { email: e, role: r, user: user.email }).then(() => syncData())} onEditUser={(old, email, role) => postToSheet(SHEET_API_URL, 'EDIT_USER', { id: old, email, role, user: user.email }).then(() => syncData())} onDeleteUser={e => postToSheet(SHEET_API_URL, 'DELETE_USER', { id: e, user: user.email }).then(() => syncData())} darkMode={darkMode} setDarkMode={setDarkMode} settings={settings} onUpdateSettings={s => { setSettings(s); postToSheet(SHEET_API_URL, 'UPDATE_SETTINGS', { settings: s, user: user.email }).then(() => syncData()); }} userRole={userRole} /> } />
           <Route path="/reports" element={<Reports establishments={establishments} transactions={transactions} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

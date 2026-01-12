@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Establishment, Transaction, TransactionType } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
@@ -46,6 +47,16 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     }
   };
 
+  // Formatador de data robusto
+  const formatDate = (isoStr: string) => {
+    if (!isoStr) return '';
+    const parts = isoStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoStr;
+  };
+
   // Filter Logic
   const filteredData = useMemo(() => {
     return transactions.filter(t => {
@@ -72,7 +83,6 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
   };
 
   const handleExportCSV = () => {
-    // Define headers
     const headers = [
       "Data",
       "Estabelecimento",
@@ -84,16 +94,14 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
       "Observações"
     ];
 
-    // Map data to rows
     const rows = filteredData.map(t => {
       const estName = establishments.find(e => e.id === t.establishmentId)?.name || 'N/A';
-      // Escape quotes for CSV format
       const safeDesc = `"${t.description.replace(/"/g, '""')}"`;
       const safeObs = t.observations ? `"${t.observations.replace(/"/g, '""')}"` : '""';
-      const formattedAmount = t.amount.toFixed(2).replace('.', ','); // Excel friendly format for BR
+      const formattedAmount = t.amount.toFixed(2).replace('.', ',');
 
       return [
-        new Date(t.date).toLocaleDateString('pt-BR'),
+        formatDate(t.date),
         `"${estName}"`,
         safeDesc,
         t.type,
@@ -101,13 +109,10 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
         t.user,
         t.status,
         safeObs
-      ].join(';'); // Using semicolon for broader Excel compatibility in regions like Brazil
+      ].join(';');
     });
 
-    // Combine with BOM for UTF-8 support in Excel
     const csvContent = "\uFEFF" + [headers.join(';'), ...rows].join('\n');
-
-    // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -121,7 +126,6 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
 
   return (
     <div className="space-y-6">
-      {/* Filters (Hidden on Print) */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm print:hidden transition-colors">
         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">Gerar Relatório</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -144,7 +148,6 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
             />
           </div>
           
-          {/* Custom Multi-select Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Estabelecimentos</label>
             <button 
@@ -216,49 +219,37 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
         </div>
       </div>
 
-      {/* Printable Report Area */}
       <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm print:shadow-none print:border-none print:p-0 transition-colors">
-        {/* Print Header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Relatório de Fluxo de Caixa</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Relatório de Fluxo de Caixa</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Período: {new Date(startDate).toLocaleDateString('pt-BR')} até {new Date(endDate).toLocaleDateString('pt-BR')}
-          </p>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-             {selectedEstIds.length === establishments.length 
-               ? 'Todos os Estabelecimentos' 
-               : selectedEstIds.length === 1 
-                 ? establishments.find(e => e.id === selectedEstIds[0])?.name
-                 : `${selectedEstIds.length} estabelecimentos selecionados`
-             }
+            Período: {formatDate(startDate)} até {formatDate(endDate)}
           </p>
         </div>
 
-        {/* Summary Boxes */}
         <div className="grid grid-cols-3 gap-4 mb-8 border-b border-slate-200 dark:border-slate-700 pb-8">
           <div className="text-center">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total Entradas</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Total Entradas</div>
             <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{CURRENCY_FORMATTER.format(totalEntries)}</div>
           </div>
           <div className="text-center border-l border-slate-100 dark:border-slate-700">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total Saídas</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Total Saídas</div>
             <div className="text-lg font-bold text-rose-600 dark:text-rose-400">{CURRENCY_FORMATTER.format(totalExits)}</div>
           </div>
           <div className="text-center border-l border-slate-100 dark:border-slate-700">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo Final</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Saldo Final</div>
             <div className={`text-lg font-bold ${finalBalance >= 0 ? 'text-slate-800 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
               {CURRENCY_FORMATTER.format(finalBalance)}
             </div>
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-medium">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px] tracking-widest">
               <tr>
                 <th className="px-4 py-3 rounded-l-lg">Data</th>
-                <th className="px-4 py-3">Estabelecimento</th>
+                <th className="px-4 py-3">Unidade</th>
                 <th className="px-4 py-3">Descrição</th>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3 rounded-r-lg text-right">Valor</th>
@@ -268,21 +259,21 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
               {filteredData.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    Nenhuma transação encontrada para este período ou filtro.
+                    Nenhuma transação encontrada.
                   </td>
                 </tr>
               ) : (
                 filteredData.map(t => (
                   <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {new Date(t.date).toLocaleDateString('pt-BR')}
+                      {formatDate(t.date)}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       {establishments.find(e => e.id === t.establishmentId)?.name}
                     </td>
-                    <td className="px-4 py-3 text-slate-800 dark:text-slate-200 font-medium">{t.description}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-200 font-bold">{t.description}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
                         t.type === TransactionType.ENTRADA 
                         ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' 
                         : 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
@@ -290,7 +281,7 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
                         {t.type}
                       </span>
                     </td>
-                    <td className={`px-4 py-3 text-right font-bold ${
+                    <td className={`px-4 py-3 text-right font-black ${
                       t.type === TransactionType.ENTRADA ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                     }`}>
                       {CURRENCY_FORMATTER.format(t.amount)}
@@ -302,9 +293,8 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
           </table>
         </div>
         
-        {/* Footer for print */}
-        <div className="hidden print:block mt-8 pt-4 border-t border-slate-200 text-center text-xs text-slate-400">
-          Gerado automaticamente por Fluxo de Caixa GSC em {new Date().toLocaleString('pt-BR')}
+        <div className="hidden print:block mt-8 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400 font-bold uppercase">
+          Gerado automaticamente por Fluxo GSC em {new Date().toLocaleString('pt-BR')}
         </div>
       </div>
     </div>

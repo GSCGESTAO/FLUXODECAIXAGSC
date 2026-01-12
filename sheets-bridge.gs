@@ -1,6 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.9
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.6
  */
 
 function doGet(e) {
@@ -13,31 +13,7 @@ function doGet(e) {
   const authorizedUsers = userSheet.getDataRange().getValues().slice(1).filter(row => row[1]).map(row => ({ email: String(row[1]).toLowerCase().trim(), role: String(row[2]) || 'Convidado' }));
 
   const transSheet = ss.getSheetByName("Transacoes") || ss.insertSheet("Transacoes");
-  const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => {
-    let rawDate = row[1];
-    let dateStr = "";
-    
-    if (rawDate instanceof Date) {
-      // Formato ISO YYYY-MM-DD para garantir paridade total
-      dateStr = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-    } else {
-      dateStr = String(rawDate);
-    }
-    
-    return { 
-      id: String(row[0]), 
-      date: dateStr, 
-      timestamp: String(row[2]), 
-      establishmentId: String(row[3]), 
-      type: String(row[4]), 
-      amount: Number(row[5]), 
-      description: String(row[6]), 
-      observations: String(row[7]), 
-      status: String(row[8]), 
-      user: String(row[9]),
-      isEdited: row[10] === true || String(row[10]).toUpperCase() === "TRUE"
-    };
-  }).reverse() : [];
+  const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse() : [];
 
   const notesSheet = ss.getSheetByName("Anotacoes") || ss.insertSheet("Anotacoes");
   const notesMap = {};
@@ -58,43 +34,8 @@ function doPost(e) {
     const user = payload.user || "Unknown";
 
     if (action === 'ADD_TRANSACTION') {
-      ss.getSheetByName("Transacoes").appendRow([
-        payload.id, payload.date, payload.timestamp, payload.establishmentId, 
-        payload.type, payload.amount, payload.description, payload.observations || "", 
-        payload.status, payload.user, false
-      ]);
+      ss.getSheetByName("Transacoes").appendRow([payload.id, payload.date, payload.timestamp, payload.establishmentId, payload.type, payload.amount, payload.description, payload.observations || "", payload.status, payload.user]);
     } 
-    else if (action === 'EDIT_TRANSACTION') {
-      const sheet = ss.getSheetByName("Transacoes");
-      const data = sheet.getDataRange().getValues();
-      let rowToEdit = -1;
-      
-      for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(payload.id)) {
-          rowToEdit = i + 1;
-          break;
-        }
-      }
-
-      if (rowToEdit !== -1) {
-        const updateValues = [
-          payload.id, 
-          payload.date, 
-          payload.timestamp, 
-          payload.establishmentId, 
-          payload.type, 
-          payload.amount, 
-          payload.description, 
-          payload.observations || "", 
-          payload.status, 
-          payload.user, 
-          true 
-        ];
-        sheet.getRange(rowToEdit, 1, 1, 11).setValues([updateValues]);
-      } else {
-        throw new Error("Lançamento não encontrado: " + payload.id);
-      }
-    }
     else if (action === 'EDIT_ESTABLISHMENT') {
       const sheet = ss.getSheetByName("Estabelecimentos");
       const data = sheet.getDataRange().getValues();
@@ -116,6 +57,7 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) {
+          // payload.id é o e-mail antigo, payload.email é o novo, payload.role é o cargo
           sheet.getRange(i + 1, 2, 1, 2).setValues([[payload.email.toLowerCase().trim(), payload.role]]);
           break;
         }
@@ -143,8 +85,15 @@ function doPost(e) {
       if (!found) sheet.appendRow([payload.entityId || "GENERAL", payload.notes]);
     }
 
+    logActivity(ss, user, action, "OK");
     return ContentService.createTextOutput(JSON.stringify({ "status": "success" })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function logActivity(ss, user, action, details) {
+  const logSheet = ss.getSheetByName("Logs") || ss.insertSheet("Logs");
+  if (logSheet.getLastRow() === 0) logSheet.appendRow(["Data", "Usuario", "Acao", "Detalhes"]);
+  logSheet.appendRow([new Date(), user, action, details]);
 }
