@@ -48,8 +48,6 @@ export interface Transaction {
 
 export interface AppSettings {
   readyDescriptions: string[];
-  groupAIds: string[];
-  groupBIds: string[];
   showNotes: boolean;
   showAI: boolean;
   showChart: boolean;
