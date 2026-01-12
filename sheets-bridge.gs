@@ -1,6 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.8
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.9
  */
 
 function doGet(e) {
@@ -16,11 +16,14 @@ function doGet(e) {
   const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => {
     let rawDate = row[1];
     let dateStr = "";
+    
     if (rawDate instanceof Date) {
+      // Formato ISO YYYY-MM-DD para garantir paridade total
       dateStr = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
     } else {
       dateStr = String(rawDate);
     }
+    
     return { 
       id: String(row[0]), 
       date: dateStr, 
@@ -32,7 +35,7 @@ function doGet(e) {
       observations: String(row[7]), 
       status: String(row[8]), 
       user: String(row[9]),
-      isEdited: row[10] === true || row[10] === "TRUE"
+      isEdited: row[10] === true || String(row[10]).toUpperCase() === "TRUE"
     };
   }).reverse() : [];
 
@@ -66,7 +69,6 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       let rowToEdit = -1;
       
-      // Busca pela ID única do lançamento
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][0]) === String(payload.id)) {
           rowToEdit = i + 1;
@@ -75,8 +77,6 @@ function doPost(e) {
       }
 
       if (rowToEdit !== -1) {
-        // Atualiza a linha na planilha mãe
-        // Estrutura: [ID, DATA, TIMESTAMP, UNIDADE_ID, TIPO, VALOR, DESC, OBS, STATUS, USUARIO, IS_EDITED]
         const updateValues = [
           payload.id, 
           payload.date, 
@@ -88,11 +88,11 @@ function doPost(e) {
           payload.observations || "", 
           payload.status, 
           payload.user, 
-          true // Define IS_EDITED como true
+          true 
         ];
         sheet.getRange(rowToEdit, 1, 1, 11).setValues([updateValues]);
       } else {
-        throw new Error("Lançamento ID " + payload.id + " não encontrado.");
+        throw new Error("Lançamento não encontrado: " + payload.id);
       }
     }
     else if (action === 'EDIT_ESTABLISHMENT') {
@@ -143,15 +143,8 @@ function doPost(e) {
       if (!found) sheet.appendRow([payload.entityId || "GENERAL", payload.notes]);
     }
 
-    logActivity(ss, user, action, "OK - SYNC");
-    return ContentService.createTextOutput(JSON.stringify({ "status": "success", "action": action })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ "status": "success" })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-function logActivity(ss, user, action, details) {
-  const logSheet = ss.getSheetByName("Logs") || ss.insertSheet("Logs");
-  if (logSheet.getLastRow() === 0) logSheet.appendRow(["Data", "Usuario", "Acao", "Detalhes"]);
-  logSheet.appendRow([new Date(), user, action, details]);
 }
