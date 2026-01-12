@@ -23,7 +23,8 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const isAdmin = userRole === 'Admin';
   const isFinanceiro = userRole === 'Financeiro';
-  const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'groups' | 'pref'>(isAdmin ? 'estab' : 'pref');
+  // Removida a aba 'groups'
+  const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'pref'>(isAdmin ? 'estab' : 'pref');
 
   const [formEst, setFormEst] = useState<{id?: string, name: string, email: string} | null>(null);
   const [formUser, setFormUser] = useState<{oldEmail?: string, email: string, role: UserRole} | null>(null);
@@ -53,21 +54,6 @@ export const Settings: React.FC<SettingsProps> = ({
     onUpdateSettings({ ...settings, readyDescriptions: settings.readyDescriptions.filter(d => d !== val) });
   };
 
-  const toggleGroup = (id: string, group: 'A' | 'B') => {
-    let groupA = [...(settings.groupAIds || [])];
-    let groupB = [...(settings.groupBIds || [])];
-
-    if (group === 'A') {
-      if (groupA.includes(id)) groupA = groupA.filter(i => i !== id);
-      else { groupA.push(id); groupB = groupB.filter(i => i !== id); }
-    } else {
-      if (groupB.includes(id)) groupB = groupB.filter(i => i !== id);
-      else { groupB.push(id); groupA = groupA.filter(i => i !== id); }
-    }
-
-    onUpdateSettings({ ...settings, groupAIds: groupA, groupBIds: groupB });
-  };
-
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Painel de Controle</h2>
@@ -76,7 +62,6 @@ export const Settings: React.FC<SettingsProps> = ({
         {isAdmin && <button onClick={() => setActiveTab('estab')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'estab' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Unidades</button>}
         {isAdmin && <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Acessos</button>}
         {(isAdmin || isFinanceiro) && <button onClick={() => setActiveTab('desc')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'desc' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Sugestões</button>}
-        {isAdmin && <button onClick={() => setActiveTab('groups')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'groups' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Grupos</button>}
         <button onClick={() => setActiveTab('pref')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'pref' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Preferências</button>
       </div>
 
@@ -133,27 +118,6 @@ export const Settings: React.FC<SettingsProps> = ({
                     <button onClick={() => handleRemoveDesc(desc)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
                   </div>
                 ))}
-             </div>
-          </div>
-        )}
-
-        {activeTab === 'groups' && isAdmin && (
-          <div className="p-6">
-             <h3 className="font-black text-[10px] uppercase text-slate-400 mb-6 tracking-[0.2em]">Configurar Saldo da Dashboard</h3>
-             <div className="space-y-3">
-                {establishments.map(est => {
-                    const isInA = (settings.groupAIds || []).includes(est.id);
-                    const isInB = (settings.groupBIds || []).includes(est.id);
-                    return (
-                        <div key={est.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 transition-all">
-                            <span className="text-sm font-black uppercase tracking-tight">{est.name}</span>
-                            <div className="flex gap-2">
-                                <button onClick={() => toggleGroup(est.id, 'A')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${isInA ? 'bg-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200'}`}>Grupo A</button>
-                                <button onClick={() => toggleGroup(est.id, 'B')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${isInB ? 'bg-orange-500 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200'}`}>Grupo B</button>
-                            </div>
-                        </div>
-                    );
-                })}
              </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';
@@ -15,8 +15,98 @@ interface DashboardProps {
   userRole?: UserRole | null;
 }
 
+const GroupSelector: React.FC<{
+  label: string;
+  establishments: Establishment[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}> = ({ label, establishments, selectedIds, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggle = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(i => i !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+      >
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Selecionar {label}</span>
+        <div className="flex items-center gap-1 bg-indigo-500 text-white text-[9px] px-1.5 rounded-md font-bold">
+           {selectedIds.length}
+        </div>
+        <svg className={`w-3 h-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-[60] py-2 animate-fade-in">
+           <div className="max-h-60 overflow-y-auto px-1">
+             {establishments.map(est => (
+               <button 
+                key={est.id}
+                onClick={() => toggle(est.id)}
+                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+               >
+                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase truncate pr-4">{est.name}</span>
+                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${selectedIds.includes(est.id) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-200 dark:border-slate-600'}`}>
+                   {selectedIds.includes(est.id) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>}
+                 </div>
+               </button>
+             ))}
+           </div>
+           {establishments.length > 0 && (
+             <div className="px-2 pt-2 mt-1 border-t border-slate-100 dark:border-slate-700 flex gap-2">
+                <button onClick={() => onChange(establishments.map(e => e.id))} className="flex-1 py-1.5 text-[9px] font-black uppercase bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300">Todos</button>
+                <button onClick={() => onChange([])} className="flex-1 py-1.5 text-[9px] font-black uppercase bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300">Nenhum</button>
+             </div>
+           )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactions, notes = {}, onSaveNote, settings, userRole }) => {
   const navigate = useNavigate();
+  
+  // Seleção dinâmica dos grupos via LocalStorage
+  const [selectedGroupA, setSelectedGroupA] = useState<string[]>(() => {
+    const saved = localStorage.getItem('gsc_group_a');
+    return saved ? JSON.parse(saved) : (establishments.length > 0 ? [establishments[0].id] : []);
+  });
+
+  const [selectedGroupB, setSelectedGroupB] = useState<string[]>(() => {
+    const saved = localStorage.getItem('gsc_group_b');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gsc_group_a', JSON.stringify(selectedGroupA));
+  }, [selectedGroupA]);
+
+  useEffect(() => {
+    localStorage.setItem('gsc_group_b', JSON.stringify(selectedGroupB));
+  }, [selectedGroupB]);
+
   const [noteScope, setNoteScope] = useState<string>("GENERAL");
   const [localNote, setLocalNote] = useState(notes["GENERAL"] || "");
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -37,14 +127,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
       }, 0);
   };
 
-  const leftBalance = useMemo(() => {
-    const ids = settings.groupAIds && settings.groupAIds.length > 0 ? settings.groupAIds : establishments.map(e => e.id);
-    return calculateGroupBalance(ids);
-  }, [transactions, settings.groupAIds, establishments]);
+  const leftBalance = useMemo(() => calculateGroupBalance(selectedGroupA), [transactions, selectedGroupA]);
+  const rightBalance = useMemo(() => calculateGroupBalance(selectedGroupB), [transactions, selectedGroupB]);
 
-  const rightBalance = useMemo(() => calculateGroupBalance(settings.groupBIds || []), [transactions, settings.groupBIds]);
-
-  // Gráfico ajustado para os últimos 7 dias reais (hoje + 6 anteriores)
   const chartData = useMemo(() => {
     const data = [];
     const now = new Date();
@@ -88,13 +173,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl">
-          <h2 className="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1">Grupo A</h2>
-          <div className="text-3xl font-black">{CURRENCY_FORMATTER.format(leftBalance)}</div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center px-2">
+            <GroupSelector label="Grupo A" establishments={establishments} selectedIds={selectedGroupA} onChange={setSelectedGroupA} />
+          </div>
+          <div className="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl min-h-[140px] flex flex-col justify-center transition-all">
+            <h2 className="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1">Grupo A</h2>
+            <div className="text-3xl font-black">{CURRENCY_FORMATTER.format(leftBalance)}</div>
+          </div>
         </div>
-        <div className="bg-orange-500 rounded-3xl p-6 text-white shadow-xl">
-          <h2 className="text-orange-100 text-[10px] font-black uppercase tracking-widest mb-1">Grupo B</h2>
-          <div className="text-3xl font-black">{CURRENCY_FORMATTER.format(rightBalance)}</div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between items-center px-2">
+            <GroupSelector label="Grupo B" establishments={establishments} selectedIds={selectedGroupB} onChange={setSelectedGroupB} />
+          </div>
+          <div className="bg-orange-500 rounded-3xl p-6 text-white shadow-xl min-h-[140px] flex flex-col justify-center transition-all">
+            <h2 className="text-orange-100 text-[10px] font-black uppercase tracking-widest mb-1">Grupo B</h2>
+            <div className="text-3xl font-black">{CURRENCY_FORMATTER.format(rightBalance)}</div>
+          </div>
         </div>
       </div>
 
