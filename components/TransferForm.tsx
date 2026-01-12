@@ -38,16 +38,12 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
 
     setIsSubmitting(true);
 
-    // Correção: Para input type="number", o valor já vem com ponto decimal padrão.
     const numericAmount = parseFloat(amount) || 0;
     const sourceEst = establishments.find(e => e.id === sourceId);
     const targetEst = establishments.find(e => e.id === targetId);
 
     if (!sourceEst || !targetEst) return;
 
-    const commonId = crypto.randomUUID(); // Link lógico (opcional, mas bom para rastreio)
-
-    // 1. Transação de Saída (Origem)
     const transactionOut: Transaction = {
       id: crypto.randomUUID(),
       date,
@@ -61,11 +57,10 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
       user: userEmail
     };
 
-    // 2. Transação de Entrada (Destino)
     const transactionIn: Transaction = {
       id: crypto.randomUUID(),
       date,
-      timestamp: new Date().toISOString(), // Mesmo timestamp aproximado
+      timestamp: new Date().toISOString(),
       establishmentId: targetId,
       type: TransactionType.ENTRADA,
       amount: numericAmount,
@@ -75,7 +70,6 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
       user: userEmail
     };
 
-    // Salva ambas
     await onSave(transactionOut);
     await onSave(transactionIn);
 
@@ -101,7 +95,6 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
                     value={sourceId} 
                     onChange={(e) => {
                       setSourceId(e.target.value);
-                      // Se selecionar a mesma que o alvo, tenta mudar o alvo
                       if (e.target.value === targetId) {
                          const other = establishments.find(est => est.id !== e.target.value);
                          if (other) setTargetId(other.id);
@@ -115,8 +108,10 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
                 </select>
             </div>
 
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0">
-                <svg className="w-6 h-6 rotate-90 md:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-700 text-amber-500 shadow-sm shrink-0 border border-slate-100 dark:border-slate-600">
+                <svg className="w-6 h-6 rotate-90 md:rotate-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                </svg>
             </div>
 
             <div className="flex-1 w-full">
@@ -164,7 +159,11 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
         <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700">
             <button type="submit" disabled={isSubmitting || !amount} className={`w-full py-4 px-4 text-white rounded-xl font-bold text-lg transition-colors shadow-lg flex items-center justify-center gap-2 ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'}`}>
                 {isSubmitting ? 'Processando...' : 'Confirmar Transferência'}
-                {!isSubmitting && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>}
+                {!isSubmitting && (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                )}
             </button>
             <p className="text-center text-xs text-slate-400 mt-4">
                 Esta ação criará automaticamente um lançamento de saída na origem e um de entrada no destino.
