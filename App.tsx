@@ -40,27 +40,29 @@ const App: React.FC = () => {
   const [syncError, setSyncError] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('gsc_dark_mode') === 'true');
 
-  // Função para normalizar qualquer string de data para YYYY-MM-DD
+  /**
+   * NORMALIZADOR DE DATA GSC
+   * Converte qualquer formato (ISO, BR, System String) para YYYY-MM-DD literal
+   * sem sofrer interferência de fuso horário.
+   */
   const normalizeDate = (raw: any): string => {
-    if (!raw) return new Date().toISOString().split('T')[0];
+    if (!raw) return new Date().toLocaleDateString('en-CA');
     const s = String(raw).trim();
     
-    // Formato Brasileiro DD/MM/AAAA
-    if (s.includes('/') && s.split('/').length >= 3) {
-      const parts = s.split(' ')[0].split('/');
-      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
-    
-    // Tenta converter strings longas ou ISO
+    // 1. Tenta capturar YYYY-MM-DD direto (padrão da sua planilha)
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+    // 2. Tenta capturar DD/MM/YYYY
+    const brMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+
+    // 3. Fallback para objeto Date (último recurso)
     const d = new Date(s);
     if (!isNaN(d.getTime())) {
-      // Ajuste para evitar que o fuso horário mude o dia (pega apenas a parte da data)
-      if (s.includes('T')) return s.split('T')[0];
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
-      // Se for uma data "meia noite" de sistema, o Date() pode retroceder um dia dependendo do fuso
-      // Mas para strings de sistema vindo do Google, d.toISOString() costuma ser o mais seguro
       return `${year}-${month}-${day}`;
     }
     
@@ -86,7 +88,7 @@ const App: React.FC = () => {
         
         const remoteTransactions = data.transactions.map(t => ({
           ...t,
-          date: normalizeDate(t.date), // Normalização agressiva aqui
+          date: normalizeDate(t.date),
           isSynced: true 
         }));
 
@@ -133,10 +135,8 @@ const App: React.FC = () => {
 
   const handleUpdateTransaction = async (updated: Transaction) => {
     if (userRole === 'Convidado') return;
-    
     const item = { ...updated, isEdited: true, isSynced: false };
     setTransactions(prev => prev.map(t => t.id === item.id ? item : t));
-    
     if (SHEET_API_URL) {
       const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', { ...item, user: user?.email });
       if (success) await syncData();
@@ -151,17 +151,17 @@ const App: React.FC = () => {
         <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
           <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
         </div>
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Conexão Offline</h2>
-        <p className="text-slate-500 text-sm mt-2 max-w-xs">Não conseguimos conectar com a base de dados GSC.</p>
-        <button onClick={syncData} className="mt-6 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold">Tentar Sincronizar</button>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Servidor Indisponível</h2>
+        <p className="text-slate-500 text-sm mt-2 max-w-xs">Não foi possível carregar os dados. Verifique sua conexão.</p>
+        <button onClick={syncData} className="mt-6 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold">Reconectar</button>
       </div>
     );
   }
 
   if (isAuthorized === null) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">GSC Cloud • Sincronizando</h2>
+      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tighter">Fluxo GSC • Carregando Dados</h2>
     </div>
   );
   
