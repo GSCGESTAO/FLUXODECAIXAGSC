@@ -26,8 +26,12 @@ const App: React.FC = () => {
   const [establishments, setEstablishments] = useState<Establishment[]>(MOCK_ESTABLISHMENTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({ "GENERAL": "" });
+  
+  // Added groupAIds and groupBIds to satisfy AppSettings interface properties
   const [settings, setSettings] = useState<AppSettings>({
     readyDescriptions: [],
+    groupAIds: [],
+    groupBIds: [],
     showNotes: true,
     showAI: true,
     showChart: true,

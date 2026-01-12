@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
-import { askFinancialAssistant, AiAssistantResponse } from '../services/geminiService';
 
 interface DashboardProps {
   establishments: Establishment[];
@@ -17,8 +16,6 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactions, notes = {}, onSaveNote, settings, userRole }) => {
   const navigate = useNavigate();
-  const [leftFilterIds, setLeftFilterIds] = useState<string[]>([]);
-  const [rightFilterIds, setRightFilterIds] = useState<string[]>([]);
   const [noteScope, setNoteScope] = useState<string>("GENERAL");
   const [localNote, setLocalNote] = useState(notes["GENERAL"] || "");
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -29,49 +26,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
     setLocalNote(notes[noteScope] || "");
   }, [notes, noteScope]);
 
-  useEffect(() => {
-    if (establishments.length > 0 && leftFilterIds.length === 0) {
-      setLeftFilterIds(establishments.map(e => e.id));
-    }
-  }, [establishments, leftFilterIds]);
-
   const calculateGroupBalance = (filterIds: string[]) => {
-    if (filterIds.length === 0) return 0;
+    if (!filterIds || filterIds.length === 0) return 0;
     return transactions
       .filter(t => filterIds.includes(String(t.establishmentId)))
       .reduce((acc, t) => (t.type === TransactionType.ENTRADA) ? acc + t.amount : acc - t.amount, 0);
   };
 
-  const leftBalance = useMemo(() => calculateGroupBalance(leftFilterIds), [transactions, leftFilterIds]);
-  const rightBalance = useMemo(() => calculateGroupBalance(rightFilterIds), [transactions, rightFilterIds]);
+  const leftBalance = useMemo(() => {
+    // Se não houver configuração, o Grupo A mostra tudo
+    if (!settings.groupAIds || settings.groupAIds.length === 0) {
+        return calculateGroupBalance(establishments.map(e => e.id));
+    }
+    return calculateGroupBalance(settings.groupAIds);
+  }, [transactions, settings.groupAIds, establishments]);
 
-  /**
-   * Lógica do Gráfico de 7 Dias
-   * Gera chaves de busca baseadas no tempo LOCAL do navegador no formato YYYY-MM-DD
-   */
+  const rightBalance = useMemo(() => calculateGroupBalance(settings.groupBIds || []), [transactions, settings.groupBIds]);
+
   const chartData = useMemo(() => {
     const today = new Date();
-    
     const dates = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(today.getDate() - (6 - i));
-      // en-CA gera YYYY-MM-DD de forma limpa e local
       return d.toLocaleDateString('en-CA');
     });
 
     return dates.map(isoKey => {
-      // Busca transações que batem com a string exata YYYY-MM-DD
       const dayTransactions = transactions.filter(t => t.date === isoKey);
-      
-      const entrada = dayTransactions
-        .filter(t => t.type === TransactionType.ENTRADA)
-        .reduce((sum, t) => sum + t.amount, 0);
-        
-      const saida = dayTransactions
-        .filter(t => t.type === TransactionType.SAIDA)
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      // Label para o gráfico (DD/MM)
+      const entrada = dayTransactions.filter(t => t.type === TransactionType.ENTRADA).reduce((sum, t) => sum + t.amount, 0);
+      const saida = dayTransactions.filter(t => t.type === TransactionType.SAIDA).reduce((sum, t) => sum + t.amount, 0);
       const parts = isoKey.split('-');
       return { 
         name: `${parts[2]}/${parts[1]}`, 

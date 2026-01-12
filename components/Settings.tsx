@@ -23,10 +23,11 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const isAdmin = userRole === 'Admin';
   const isFinanceiro = userRole === 'Financeiro';
-  const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'pref'>(isAdmin ? 'estab' : 'pref');
+  const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'groups' | 'pref'>(isAdmin ? 'estab' : 'pref');
 
   const [formEst, setFormEst] = useState<{id?: string, name: string, email: string} | null>(null);
   const [formUser, setFormUser] = useState<{oldEmail?: string, email: string, role: UserRole} | null>(null);
+  const [newDesc, setNewDesc] = useState('');
 
   const EditIcon = () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -46,6 +47,41 @@ export const Settings: React.FC<SettingsProps> = ({
     return `${slug}-${shortUuid}`;
   };
 
+  const handleAddDesc = () => {
+    if (!newDesc.trim()) return;
+    const currentDescs = settings.readyDescriptions || [];
+    if (currentDescs.includes(newDesc.trim())) return;
+    onUpdateSettings({ ...settings, readyDescriptions: [...currentDescs, newDesc.trim()] });
+    setNewDesc('');
+  };
+
+  const handleRemoveDesc = (desc: string) => {
+    onUpdateSettings({ ...settings, readyDescriptions: (settings.readyDescriptions || []).filter(d => d !== desc) });
+  };
+
+  const toggleGroup = (estId: string, group: 'A' | 'B') => {
+    let groupA = [...(settings.groupAIds || [])];
+    let groupB = [...(settings.groupBIds || [])];
+
+    if (group === 'A') {
+        if (groupA.includes(estId)) {
+            groupA = groupA.filter(id => id !== estId);
+        } else {
+            groupA.push(estId);
+            groupB = groupB.filter(id => id !== estId);
+        }
+    } else {
+        if (groupB.includes(estId)) {
+            groupB = groupB.filter(id => id !== estId);
+        } else {
+            groupB.push(estId);
+            groupA = groupA.filter(id => id !== estId);
+        }
+    }
+
+    onUpdateSettings({ ...settings, groupAIds: groupA, groupBIds: groupB });
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Ajustes GSC</h2>
@@ -54,6 +90,7 @@ export const Settings: React.FC<SettingsProps> = ({
         {isAdmin && <button onClick={() => setActiveTab('estab')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'estab' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Unidades</button>}
         {isAdmin && <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Usuários</button>}
         {(isAdmin || isFinanceiro) && <button onClick={() => setActiveTab('desc')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'desc' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Descrições</button>}
+        {isAdmin && <button onClick={() => setActiveTab('groups')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'groups' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Grupos</button>}
         <button onClick={() => setActiveTab('pref')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'pref' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Preferências</button>
       </div>
 
@@ -91,7 +128,6 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* ... manter outras abas ... */}
         {activeTab === 'users' && isAdmin && (
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
              <div className="p-6 bg-slate-50 dark:bg-slate-900/30 flex justify-between items-center">
@@ -128,6 +164,54 @@ export const Settings: React.FC<SettingsProps> = ({
                  </div>
                </div>
              ))}
+          </div>
+        )}
+
+        {activeTab === 'desc' && (isAdmin || isFinanceiro) && (
+          <div className="p-6 space-y-6">
+             <div>
+                <h3 className="font-bold text-sm uppercase text-slate-400 mb-4 tracking-widest">Descrições Padronizadas</h3>
+                <div className="flex gap-2">
+                    <input 
+                      placeholder="Ex: Aluguel, Provisão, Venda Balcão" 
+                      value={newDesc} 
+                      onChange={e => setNewDesc(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddDesc()}
+                      className="flex-1 p-4 rounded-2xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-bold outline-none"
+                    />
+                    <button onClick={handleAddDesc} className="bg-indigo-600 text-white px-6 rounded-2xl font-bold text-xs">Adicionar</button>
+                </div>
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
+                {(settings.readyDescriptions || []).map((desc, idx) => (
+                   <div key={idx} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl group transition-all hover:bg-slate-100">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{desc}</span>
+                      <button onClick={() => handleRemoveDesc(desc)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
+                   </div>
+                ))}
+             </div>
+          </div>
+        )}
+
+        {activeTab === 'groups' && isAdmin && (
+          <div className="p-6">
+             <h3 className="font-bold text-sm uppercase text-slate-400 mb-6 tracking-widest">Visualização Agrupada (Dash)</h3>
+             <p className="text-[10px] text-slate-500 mb-6 font-medium">Defina quais unidades compõem o saldo do Grupo A e do Grupo B na tela inicial.</p>
+             <div className="space-y-3">
+                {establishments.map(est => {
+                    const isInA = (settings.groupAIds || []).includes(est.id);
+                    const isInB = (settings.groupBIds || []).includes(est.id);
+                    return (
+                        <div key={est.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <span className="text-sm font-bold">{est.name}</span>
+                            <div className="flex gap-2">
+                                <button onClick={() => toggleGroup(est.id, 'A')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${isInA ? 'bg-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200'}`}>Grupo A</button>
+                                <button onClick={() => toggleGroup(est.id, 'B')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${isInB ? 'bg-orange-500 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200'}`}>Grupo B</button>
+                            </div>
+                        </div>
+                    );
+                })}
+             </div>
           </div>
         )}
 
