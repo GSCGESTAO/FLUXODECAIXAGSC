@@ -44,6 +44,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
     if (!dateStr) return "N/A";
     const date = new Date(dateStr + 'T12:00:00');
     if (isNaN(date.getTime())) return dateStr;
+    // Retorno simplificado para dd/mm/aaaa conforme solicitado
     return date.toLocaleDateString('pt-BR');
   };
 
@@ -65,16 +66,16 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-slate-400 font-bold text-[10px] uppercase tracking-widest ml-1">Movimentações Recentes</h3>
+        <h3 className="text-slate-400 font-bold text-[10px] uppercase tracking-widest ml-1">Movimentações</h3>
         {estTransactions.map(t => (
-          <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex justify-between items-center">
+          <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex justify-between items-center transition-all">
             <div className="flex items-start gap-3">
               <div className={`mt-1.5 w-1.5 h-1.5 rounded-full ${t.type === TransactionType.ENTRADA ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               <div>
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{t.description}</div>
                 <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1.5">
                   {handleDateDisplay(t.date)} • {t.user.split('@')[0]}
-                  {t.isEdited && <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 rounded">Editado</span>}
+                  {t.isEdited && <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter">Ajustado</span>}
                 </div>
               </div>
             </div>
@@ -83,8 +84,8 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                   {t.type === TransactionType.ENTRADA ? '+' : '-'} {CURRENCY_FORMATTER.format(t.amount)}
                 </div>
                 {isAdmin && (
-                  <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600 p-1">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                  <button onClick={() => startEdit(t)} className="text-slate-300 hover:text-indigo-600 p-1.5 bg-slate-50 dark:bg-slate-900 rounded-lg transition-colors">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                   </button>
                 )}
             </div>
@@ -94,29 +95,35 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
 
       {editingTransaction && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-md p-8 shadow-2xl border dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-md p-8 shadow-2xl border dark:border-slate-700 animate-fade-in">
                 <h3 className="text-lg font-black text-slate-800 dark:text-white mb-6 uppercase tracking-widest">Ajustar Lançamento</h3>
                 
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                      <button onClick={() => setEditFormType(TransactionType.ENTRADA)} className={`py-2 rounded-lg text-[10px] font-black uppercase ${editFormType === TransactionType.ENTRADA ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Entrada</button>
-                      <button onClick={() => setEditFormType(TransactionType.SAIDA)} className={`py-2 rounded-lg text-[10px] font-black uppercase ${editFormType === TransactionType.SAIDA ? 'bg-white dark:bg-slate-600 text-rose-600 shadow-sm' : 'text-slate-400'}`}>Saída</button>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-700 p-1.5 rounded-2xl">
+                      <button onClick={() => setEditFormType(TransactionType.ENTRADA)} className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.ENTRADA ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Entrada</button>
+                      <button onClick={() => setEditFormType(TransactionType.SAIDA)} className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.SAIDA ? 'bg-white dark:bg-slate-600 text-rose-600 shadow-sm' : 'text-slate-400'}`}>Saída</button>
                     </div>
 
-                    <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm" placeholder="Descrição" />
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição</label>
+                        <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-medium" />
+                    </div>
                     
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                      <input type="number" step="0.01" value={editFormAmount} onChange={e => setEditFormAmount(e.target.value)} className="w-full p-4 pl-12 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-lg font-black" />
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                          <input type="number" step="0.01" value={editFormAmount} onChange={e => setEditFormAmount(e.target.value)} className="w-full p-4 pl-12 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-lg font-black" />
+                        </div>
                     </div>
                 </div>
 
                 <div className="flex gap-3 mt-8">
-                    <button onClick={() => setEditingTransaction(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs uppercase">Descartar</button>
+                    <button onClick={() => setEditingTransaction(null)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-700 rounded-2xl font-bold text-xs uppercase tracking-widest text-slate-500">Descartar</button>
                     <button onClick={() => {
                         onUpdateTransaction({ ...editingTransaction, amount: parseFloat(editFormAmount), description: editFormDesc, type: editFormType });
                         setEditingTransaction(null);
-                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase shadow-md">Gravar Ajuste</button>
+                    }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg">Gravar Alteração</button>
                 </div>
             </div>
         </div>

@@ -57,11 +57,13 @@ const App: React.FC = () => {
         if (data.notes) setNotes(data.notes);
         if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
         
-        // Padronização de datas para evitar "Invalid Date"
+        // Parser robusto para datas vindas do Google Sheets
         const remoteTransactions = data.transactions.map(t => {
-          let cleanDate = t.date;
+          let cleanDate = String(t.date).trim();
           if (cleanDate.includes('/')) {
-            const [d, m, y] = cleanDate.split('/');
+            // Se vier DD/MM/AAAA ou DD/MM/AAAA HH:MM
+            const [datePart] = cleanDate.split(' ');
+            const [d, m, y] = datePart.split('/');
             cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
           }
           return { ...t, date: cleanDate, isSynced: true };
@@ -110,12 +112,17 @@ const App: React.FC = () => {
 
   const handleUpdateTransaction = async (updated: Transaction) => {
     if (userRole === 'Convidado') return;
+    
+    // Atualização local imediata
     const item = { ...updated, isEdited: true, isSynced: false };
     setTransactions(prev => prev.map(t => t.id === item.id ? item : t));
     
     if (SHEET_API_URL) {
       const success = await postToSheet(SHEET_API_URL, 'EDIT_TRANSACTION', { ...item, user: user?.email });
-      if (success) await syncData();
+      if (success) {
+        // Recarregar para garantir paridade total com a planilha mãe
+        await syncData();
+      }
     }
   };
 
@@ -124,11 +131,11 @@ const App: React.FC = () => {
   if (syncError && isAuthorized === null) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4 animate-bounce">
           <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
         </div>
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Erro de Conexão</h2>
-        <p className="text-slate-500 text-sm mt-2 max-w-xs">Não foi possível validar seu acesso. Verifique sua conexão.</p>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Conexão Interrompida</h2>
+        <p className="text-slate-500 text-sm mt-2 max-w-xs">Não conseguimos validar seu acesso. Verifique sua rede.</p>
         <button onClick={syncData} className="mt-6 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold">Tentar Novamente</button>
       </div>
     );
@@ -137,7 +144,7 @@ const App: React.FC = () => {
   if (isAuthorized === null) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
       <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white">Carregando GSC Cloud...</h2>
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white">Acessando Nuvem GSC...</h2>
     </div>
   );
   
