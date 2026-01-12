@@ -43,6 +43,7 @@ export interface Transaction {
   status: TransactionStatus;
   user: string;
   isSynced?: boolean;
+  isEdited?: boolean;
 }
 
 export interface AppSettings {
