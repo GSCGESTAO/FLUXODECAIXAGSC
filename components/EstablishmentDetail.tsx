@@ -27,6 +27,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
   const [captchaInput, setCaptchaInput] = useState('');
   const [editFormAmount, setEditFormAmount] = useState('');
   const [editFormDesc, setEditFormDesc] = useState('');
+  const [editFormType, setEditFormType] = useState<TransactionType>(TransactionType.SAIDA);
 
   const establishment = establishments.find(e => e.id === id);
   const estTransactions = useMemo(() => {
@@ -53,6 +54,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
     setEditingTransaction(t);
     setEditFormAmount(t.amount.toString());
     setEditFormDesc(t.description);
+    setEditFormType(t.type);
     setCaptchaChallenge({ a: Math.floor(Math.random() * 10), b: Math.floor(Math.random() * 10) });
     setCaptchaInput('');
   };
@@ -142,6 +144,11 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
             <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-fade-in border dark:border-slate-700">
                 <h3 className="text-lg font-black text-slate-800 dark:text-white mb-6 uppercase tracking-widest text-center">Corrigir Lançamento</h3>
                 <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-700 p-1.5 rounded-2xl mb-4">
+                      <button type="button" onClick={() => setEditFormType(TransactionType.ENTRADA)} className={`py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.ENTRADA ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Entrada</button>
+                      <button type="button" onClick={() => setEditFormType(TransactionType.SAIDA)} className={`py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.SAIDA ? 'bg-white dark:bg-slate-600 text-rose-600 shadow-sm' : 'text-slate-500'}`}>Saída</button>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
                       <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold" />
@@ -159,7 +166,13 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                     <button onClick={() => setEditingTransaction(null)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-700 rounded-2xl font-black text-[10px] uppercase tracking-widest">Cancelar</button>
                     <button onClick={() => {
                         if (parseInt(captchaInput) !== (captchaChallenge.a + captchaChallenge.b)) { alert("Cálculo incorreto!"); return; }
-                        onUpdateTransaction({ ...editingTransaction, amount: parseFloat(editFormAmount), description: editFormDesc, isEdited: true });
+                        onUpdateTransaction({ 
+                          ...editingTransaction, 
+                          amount: parseFloat(editFormAmount), 
+                          description: editFormDesc, 
+                          type: editFormType,
+                          isEdited: true 
+                        });
                         setEditingTransaction(null);
                     }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg">Gravar Alteração</button>
                 </div>

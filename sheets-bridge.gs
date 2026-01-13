@@ -1,6 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.6
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.7
  */
 
 function doGet(e) {
@@ -13,7 +13,19 @@ function doGet(e) {
   const authorizedUsers = userSheet.getDataRange().getValues().slice(1).filter(row => row[1]).map(row => ({ email: String(row[1]).toLowerCase().trim(), role: String(row[2]) || 'Convidado' }));
 
   const transSheet = ss.getSheetByName("Transacoes") || ss.insertSheet("Transacoes");
-  const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => ({ id: String(row[0]), date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), timestamp: String(row[2]), establishmentId: String(row[3]), type: String(row[4]), amount: Number(row[5]), description: String(row[6]), observations: String(row[7]), status: String(row[8]), user: String(row[9]) })).reverse() : [];
+  const transactions = transSheet.getDataRange().getValues().length > 1 ? transSheet.getDataRange().getValues().slice(1).map(row => ({ 
+    id: String(row[0]), 
+    date: String(row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1]), 
+    timestamp: String(row[2]), 
+    establishmentId: String(row[3]), 
+    type: String(row[4]), 
+    amount: Number(row[5]), 
+    description: String(row[6]), 
+    observations: String(row[7]), 
+    status: String(row[8]), 
+    user: String(row[9]),
+    isEdited: row[10] === true || row[10] === "TRUE" || row[10] === "true"
+  })).reverse() : [];
 
   const notesSheet = ss.getSheetByName("Anotacoes") || ss.insertSheet("Anotacoes");
   const notesMap = {};
@@ -34,8 +46,34 @@ function doPost(e) {
     const user = payload.user || "Unknown";
 
     if (action === 'ADD_TRANSACTION') {
-      ss.getSheetByName("Transacoes").appendRow([payload.id, payload.date, payload.timestamp, payload.establishmentId, payload.type, payload.amount, payload.description, payload.observations || "", payload.status, payload.user]);
+      ss.getSheetByName("Transacoes").appendRow([
+        payload.id, 
+        payload.date, 
+        payload.timestamp, 
+        payload.establishmentId, 
+        payload.type, 
+        payload.amount, 
+        payload.description, 
+        payload.observations || "", 
+        payload.status, 
+        payload.user,
+        false // isEdited inicia falso
+      ]);
     } 
+    else if (action === 'EDIT_TRANSACTION') {
+      const sheet = ss.getSheetByName("Transacoes");
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === payload.id) {
+          // Colunas: id, date, timestamp, establishmentId, type, amount, description, observations, status, user, isEdited
+          sheet.getRange(i + 1, 5).setValue(payload.type);
+          sheet.getRange(i + 1, 6).setValue(payload.amount);
+          sheet.getRange(i + 1, 7).setValue(payload.description);
+          sheet.getRange(i + 1, 11).setValue(true); // isEdited vira true
+          break;
+        }
+      }
+    }
     else if (action === 'EDIT_ESTABLISHMENT') {
       const sheet = ss.getSheetByName("Estabelecimentos");
       const data = sheet.getDataRange().getValues();
@@ -57,7 +95,6 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][1]).toLowerCase() === payload.id.toLowerCase()) {
-          // payload.id é o e-mail antigo, payload.email é o novo, payload.role é o cargo
           sheet.getRange(i + 1, 2, 1, 2).setValues([[payload.email.toLowerCase().trim(), payload.role]]);
           break;
         }
