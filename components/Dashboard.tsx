@@ -88,7 +88,6 @@ const GroupSelector: React.FC<{
 export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactions, notes = {}, onSaveNote, settings, userRole }) => {
   const navigate = useNavigate();
   
-  // Seleção dinâmica dos grupos via LocalStorage
   const [selectedGroupA, setSelectedGroupA] = useState<string[]>(() => {
     const saved = localStorage.getItem('gsc_group_a');
     return saved ? JSON.parse(saved) : (establishments.length > 0 ? [establishments[0].id] : []);
@@ -170,6 +169,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
     setIsEditingNote(false);
   };
 
+  const cancelNote = () => {
+    setLocalNote(notes[noteScope] || "");
+    setIsEditingNote(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -195,17 +199,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ establishments, transactio
       </div>
 
       {settings.showNotes && (
-        <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
-            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4 text-xs uppercase tracking-[0.2em]">
-               <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> Mural de Anotações
-            </h3>
-            <div onClick={() => !isConvidado && setIsEditingNote(true)} className="p-5 bg-amber-50/20 dark:bg-amber-900/10 border border-dashed border-amber-200 dark:border-amber-900/30 rounded-2xl cursor-text hover:bg-amber-50/40 transition-all">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in relative overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 text-xs uppercase tracking-[0.2em]">
+                 <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> Mural de Anotações
+              </h3>
+              {isEditingNote && (
+                <div className="flex gap-2 animate-fade-in">
+                  <button onClick={cancelNote} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-700 text-slate-500">Cancelar</button>
+                  <button onClick={saveNote} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none">Salvar Anotação</button>
+                </div>
+              )}
+            </div>
+            <div onClick={() => !isConvidado && !isEditingNote && setIsEditingNote(true)} className={`p-5 rounded-2xl transition-all ${isEditingNote ? 'bg-white dark:bg-slate-900 border-2 border-indigo-500/20' : 'bg-amber-50/20 dark:bg-amber-900/10 border border-dashed border-amber-200 dark:border-amber-900/30 cursor-text hover:bg-amber-50/40'}`}>
                {isEditingNote ? (
-                 <textarea autoFocus value={localNote} onChange={e => setLocalNote(e.target.value)} onBlur={saveNote} className="w-full h-24 bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-300 resize-none" />
+                 <textarea autoFocus value={localNote} onChange={e => setLocalNote(e.target.value)} className="w-full h-24 bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-300 resize-none" placeholder="Escreva algo para todos visualizarem..." />
                ) : (
                  <p className="text-sm text-slate-600 dark:text-slate-400 min-h-[60px] italic whitespace-pre-wrap">{localNote || "Toque para adicionar um lembrete..."}</p>
                )}
             </div>
+            {isEditingNote && <div className="mt-2 text-[9px] text-slate-400 font-bold uppercase text-right">Visível para todos os usuários autorizados</div>}
         </div>
       )}
 
