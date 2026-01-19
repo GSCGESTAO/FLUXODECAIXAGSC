@@ -23,7 +23,6 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const isAdmin = userRole === 'Admin';
   const isFinanceiro = userRole === 'Financeiro';
-  // Removida a aba 'groups'
   const [activeTab, setActiveTab] = useState<'estab' | 'users' | 'desc' | 'pref'>(isAdmin ? 'estab' : 'pref');
 
   const [formEst, setFormEst] = useState<{id?: string, name: string, email: string} | null>(null);
@@ -93,6 +92,45 @@ export const Settings: React.FC<SettingsProps> = ({
                  <button onClick={() => setFormEst({id: est.id, name: est.name, email: est.responsibleEmail})} className="p-2.5 bg-slate-50 dark:bg-slate-900 text-slate-300 hover:text-indigo-600 transition-all rounded-xl"><EditIcon /></button>
                </div>
              ))}
+          </div>
+        )}
+
+        {activeTab === 'users' && isAdmin && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            <div className="p-6 bg-slate-50 dark:bg-slate-900/30 flex justify-between items-center">
+               <h3 className="font-bold text-xs uppercase text-slate-400">Usuários Autorizados</h3>
+               <button onClick={() => setFormUser({email: '', role: 'Convidado'})} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Novo Usuário</button>
+            </div>
+            {formUser && (
+              <div className="p-6 bg-indigo-50/20 space-y-3 animate-fade-in">
+                 <input placeholder="E-mail do Usuário" value={formUser.email} onChange={e => setFormUser({...formUser, email: e.target.value})} className="w-full p-4 rounded-2xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold" />
+                 <select value={formUser.role} onChange={e => setFormUser({...formUser, role: e.target.value as UserRole})} className="w-full p-4 rounded-2xl border dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold">
+                    <option value="Admin">Administrador</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Convidado">Convidado</option>
+                 </select>
+                 <div className="flex gap-2">
+                    <button onClick={() => setFormUser(null)} className="flex-1 py-4 bg-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase">Cancelar</button>
+                    <button onClick={() => {
+                        if (formUser.oldEmail) onEditUser(formUser.oldEmail, formUser.email, formUser.role);
+                        else onAddUser(formUser.email, formUser.role);
+                        setFormUser(null);
+                    }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase">Salvar</button>
+                 </div>
+              </div>
+            )}
+            {authorizedUsers.map(u => (
+              <div key={u.email} className="p-6 flex justify-between items-center group hover:bg-slate-50 transition-colors">
+                <div>
+                  <div className="font-black text-slate-800 dark:text-white truncate max-w-[200px]">{u.email}</div>
+                  <div className={`text-[9px] font-black uppercase tracking-widest ${u.role === 'Admin' ? 'text-indigo-600' : u.role === 'Financeiro' ? 'text-amber-600' : 'text-slate-400'}`}>{u.role}</div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setFormUser({oldEmail: u.email, email: u.email, role: u.role})} className="p-2.5 bg-slate-50 dark:bg-slate-900 text-slate-300 hover:text-indigo-600 transition-all rounded-xl"><EditIcon /></button>
+                  <button onClick={() => { if(confirm(`Remover acesso de ${u.email}?`)) onDeleteUser(u.email); }} className="p-2.5 bg-slate-50 dark:bg-slate-900 text-slate-300 hover:text-rose-600 transition-all rounded-xl"><TrashIcon /></button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
