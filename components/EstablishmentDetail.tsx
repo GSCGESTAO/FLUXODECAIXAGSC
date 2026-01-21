@@ -28,6 +28,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
   const [editFormAmount, setEditFormAmount] = useState('');
   const [editFormDesc, setEditFormDesc] = useState('');
   const [editFormType, setEditFormType] = useState<TransactionType>(TransactionType.SAIDA);
+  const [editFormEstId, setEditFormEstId] = useState<string>('');
 
   const establishment = establishments.find(e => e.id === id);
   const estTransactions = useMemo(() => {
@@ -55,6 +56,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
     setEditFormAmount(t.amount.toString());
     setEditFormDesc(t.description);
     setEditFormType(t.type);
+    setEditFormEstId(t.establishmentId);
     setCaptchaChallenge({ a: Math.floor(Math.random() * 10), b: Math.floor(Math.random() * 10) });
     setCaptchaInput('');
   };
@@ -150,6 +152,15 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                     </div>
 
                     <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</label>
+                      <select value={editFormEstId} onChange={e => setEditFormEstId(e.target.value)} className="w-full p-4 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold">
+                        {establishments.map(est => (
+                          <option key={est.id} value={est.id}>{est.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
                       <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold" />
                     </div>
@@ -171,6 +182,7 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                           amount: parseFloat(editFormAmount), 
                           description: editFormDesc, 
                           type: editFormType,
+                          establishmentId: editFormEstId,
                           isEdited: true 
                         });
                         setEditingTransaction(null);

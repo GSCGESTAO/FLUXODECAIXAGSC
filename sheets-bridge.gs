@@ -1,6 +1,6 @@
 
 /**
- * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.7
+ * GSC FLUXO DE CAIXA - BACKEND BRIDGE v2.8
  */
 
 function doGet(e) {
@@ -66,6 +66,7 @@ function doPost(e) {
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][0]) === payload.id) {
           // Colunas: id, date, timestamp, establishmentId, type, amount, description, observations, status, user, isEdited
+          sheet.getRange(i + 1, 4).setValue(payload.establishmentId);
           sheet.getRange(i + 1, 5).setValue(payload.type);
           sheet.getRange(i + 1, 6).setValue(payload.amount);
           sheet.getRange(i + 1, 7).setValue(payload.description);
