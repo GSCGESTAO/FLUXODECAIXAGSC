@@ -43,7 +43,6 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
 
   const balance = useMemo(() => estTransactions.reduce((acc, t) => t.type === TransactionType.ENTRADA ? acc + t.amount : acc - t.amount, 0), [estTransactions]);
 
-  // Sincroniza o formulário quando o editId na URL muda (Persistência via URL)
   const editingTransaction = useMemo(() => transactions.find(t => t.id === editId), [transactions, editId]);
 
   useEffect(() => {
@@ -159,56 +158,63 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
         </div>
       </div>
 
-      {/* Menu Lateral de Edição Persistente (Drawer) */}
-      <div className={`fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-50 transition-opacity duration-300 ${editId ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
-          <div className={`fixed inset-y-0 right-0 w-full max-w-md bg-white dark:bg-slate-800 shadow-2xl transform transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) p-0 flex flex-col border-l border-slate-200 dark:border-slate-700 ${editId ? 'translate-x-0' : 'translate-x-full'}`}>
-              <div className="p-8 flex-1 overflow-y-auto">
-                <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-widest">Corrigir Lançamento</h3>
-                  <button onClick={closeEdit} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
-                  </button>
+      {/* Pop-up de Edição Centralizado e Persistente */}
+      <div className={`fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${editId ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+          <div className={`w-full max-w-xl bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh] transition-transform duration-500 ${editId ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
+              
+              {/* Header Fixo do Pop-up */}
+              <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter">Corrigir Lançamento</h3>
                 </div>
+                <button onClick={closeEdit} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+              </div>
 
-                <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-700 p-1.5 rounded-2xl">
-                      <button type="button" onClick={() => setEditFormType(TransactionType.ENTRADA)} className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.ENTRADA ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Entrada</button>
-                      <button type="button" onClick={() => setEditFormType(TransactionType.SAIDA)} className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.SAIDA ? 'bg-white dark:bg-slate-600 text-rose-600 shadow-sm' : 'text-slate-500'}`}>Saída</button>
-                    </div>
+              {/* Corpo com Scroll Interno */}
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
+                  <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-700 p-1.5 rounded-2xl">
+                    <button type="button" onClick={() => setEditFormType(TransactionType.ENTRADA)} className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.ENTRADA ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Entrada</button>
+                    <button type="button" onClick={() => setEditFormType(TransactionType.SAIDA)} className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editFormType === TransactionType.SAIDA ? 'bg-white dark:bg-slate-600 text-rose-600 shadow-sm' : 'text-slate-500'}`}>Saída</button>
+                  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</label>
-                      <select value={editFormEstId} onChange={e => setEditFormEstId(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500/20">
-                        {establishments.map(est => (
-                          <option key={est.id} value={est.id}>{est.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</label>
+                    <select value={editFormEstId} onChange={e => setEditFormEstId(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold shadow-sm focus:ring-4 focus:ring-indigo-500/10">
+                      {establishments.map(est => (
+                        <option key={est.id} value={est.id}>{est.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
-                      <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500/20" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
+                    <input type="text" value={editFormDesc} onChange={e => setEditFormDesc(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-sm font-bold shadow-sm focus:ring-4 focus:ring-indigo-500/10" />
+                  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor (R$)</label>
-                      <input type="number" step="0.01" value={editFormAmount} onChange={e => setEditFormAmount(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-3xl font-black shadow-sm focus:ring-2 focus:ring-indigo-500/20" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor (R$)</label>
+                    <input type="number" step="0.01" value={editFormAmount} onChange={e => setEditFormAmount(e.target.value)} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none bg-slate-50 dark:bg-slate-900 text-3xl font-black shadow-sm focus:ring-4 focus:ring-indigo-500/10" />
+                  </div>
 
-                    <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-6 rounded-3xl border border-indigo-100/50 dark:border-indigo-800/30">
-                        <div className="flex items-center gap-2 mb-3">
-                          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Verificação de Segurança</span>
-                        </div>
-                        <span className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Quanto é {captchaChallenge.a} + {captchaChallenge.b}?</span>
-                        <input type="number" value={captchaInput} onChange={e => setCaptchaInput(e.target.value)} className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-sm font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="Resultado" />
-                    </div>
-                </div>
+                  <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-6 rounded-3xl border border-indigo-100/50 dark:border-indigo-800/30">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Verificação de Segurança</span>
+                      </div>
+                      <span className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Quanto é {captchaChallenge.a} + {captchaChallenge.b}?</span>
+                      <input type="number" value={captchaInput} onChange={e => setCaptchaInput(e.target.value)} className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-sm font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 outline-none" placeholder="Resultado" />
+                  </div>
               </div>
               
-              <div className="p-8 bg-slate-50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-700">
+              {/* Footer Fixo do Pop-up */}
+              <div className="p-8 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-700 shrink-0">
                 <div className="flex gap-3">
-                    <button onClick={closeEdit} className="flex-1 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-500">Cancelar</button>
+                    <button onClick={closeEdit} className="flex-1 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-500 active:scale-95 transition-transform">Cancelar</button>
                     <button onClick={() => {
                         if (parseInt(captchaInput) !== (captchaChallenge.a + captchaChallenge.b)) { alert("Cálculo incorreto!"); return; }
                         if (editingTransaction) {
