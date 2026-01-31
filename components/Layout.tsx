@@ -95,7 +95,7 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </header>
 
-        <main className="max-w-5xl mx-auto p-4 md:p-6 print:max-w-none print:p-0 animate-fade-in">
+        <main className="max-w-5xl mx-auto p-4 md:p-6 print:max-w-none print:p-0">
           {children}
         </main>
 
