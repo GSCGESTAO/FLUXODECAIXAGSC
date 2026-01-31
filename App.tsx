@@ -80,7 +80,7 @@ const App: React.FC = () => {
           groupBIds: data.settings.groupBIds || []
         }));
         
-        // Fix: Cast 't' to any because 'isEdited' might arrive as a boolean or a string ("TRUE"/"true") from the Google Sheets API.
+        // remoteTransactions
         const remoteTransactions = data.transactions.map((t: any) => ({
           ...t,
           date: normalizeDate(t.date),
@@ -174,7 +174,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Dashboard establishments={establishments} transactions={transactions} notes={notes} onSaveNote={handleSaveNote} settings={settings} userRole={userRole} />} />
           <Route path="/establishment/:id" element={<EstablishmentDetail establishments={establishments} transactions={transactions} onUpdateTransaction={handleUpdateTransaction} settings={settings} userRole={userRole} />} />
-          <Route path="/new" element={<TransactionForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
+          <Route path="/new" element={<TransactionForm establishments={establishments} transactions={transactions} onSave={handleSaveTransaction} userEmail={user.email} settings={settings} />} />
           <Route path="/transfer" element={<TransferForm establishments={establishments} onSave={handleSaveTransaction} userEmail={user.email} />} />
           <Route path="/settings" element={<Settings establishments={establishments} authorizedUsers={authorizedUsers} onAddEstablishment={est => postToSheet(SHEET_API_URL, 'ADD_ESTABLISHMENT', { ...est, user: user.email }).then(() => syncData())} onUpdateEstablishment={est => postToSheet(SHEET_API_URL, 'EDIT_ESTABLISHMENT', { ...est, user: user.email }).then(() => syncData())} onAddUser={(e, r) => postToSheet(SHEET_API_URL, 'ADD_USER', { email: e, role: r, user: user.email }).then(() => syncData())} onEditUser={(old, email, role) => postToSheet(SHEET_API_URL, 'EDIT_USER', { id: old, email, role, user: user.email }).then(() => syncData())} onDeleteUser={e => postToSheet(SHEET_API_URL, 'DELETE_USER', { id: e, user: user.email }).then(() => syncData())} darkMode={darkMode} setDarkMode={setDarkMode} settings={settings} onUpdateSettings={s => { setSettings(s); postToSheet(SHEET_API_URL, 'UPDATE_SETTINGS', { settings: s, user: user.email }).then(() => syncData()); }} userRole={userRole} /> } />
           <Route path="/reports" element={<Reports establishments={establishments} transactions={transactions} />} />

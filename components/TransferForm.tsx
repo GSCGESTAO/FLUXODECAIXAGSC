@@ -13,20 +13,25 @@ interface TransferFormProps {
 export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSave, userEmail }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
   const paramSourceId = searchParams.get('sourceId');
+  const paramTargetId = searchParams.get('targetId');
+  const paramAmount = searchParams.get('amount');
+  const paramDescription = searchParams.get('description');
 
   const [sourceId, setSourceId] = useState<string>(paramSourceId || establishments[0]?.id || '');
   
   // Inicializa o destino com um ID diferente da origem (se possível)
   const [targetId, setTargetId] = useState<string>(() => {
+    if (paramTargetId) return paramTargetId;
     const initialSource = paramSourceId || establishments[0]?.id || '';
     const otherEst = establishments.find(e => e.id !== initialSource);
     return otherEst ? otherEst.id : '';
   });
 
-  const [amount, setAmount] = useState<string>('');
+  const [amount, setAmount] = useState<string>(paramAmount || '');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [observation, setObservation] = useState<string>('');
+  const [observation, setObservation] = useState<string>(paramDescription || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,14 +43,11 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
 
     setIsSubmitting(true);
 
-    // Correção: Para input type="number", o valor já vem com ponto decimal padrão.
     const numericAmount = parseFloat(amount) || 0;
     const sourceEst = establishments.find(e => e.id === sourceId);
     const targetEst = establishments.find(e => e.id === targetId);
 
     if (!sourceEst || !targetEst) return;
-
-    const commonId = crypto.randomUUID(); // Link lógico (opcional, mas bom para rastreio)
 
     // 1. Transação de Saída (Origem)
     const transactionOut: Transaction = {
@@ -56,7 +58,7 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
       type: TransactionType.SAIDA,
       amount: numericAmount,
       description: `Transferência para ${targetEst.name}`,
-      observations: `Ref: ${observation}`,
+      observations: observation ? `Ref: ${observation}` : '',
       status: TransactionStatus.APROVADO,
       user: userEmail
     };
@@ -65,12 +67,12 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
     const transactionIn: Transaction = {
       id: crypto.randomUUID(),
       date,
-      timestamp: new Date().toISOString(), // Mesmo timestamp aproximado
+      timestamp: new Date().toISOString(),
       establishmentId: targetId,
       type: TransactionType.ENTRADA,
       amount: numericAmount,
       description: `Recebido de ${sourceEst.name}`,
-      observations: `Ref: ${observation}`,
+      observations: observation ? `Ref: ${observation}` : '',
       status: TransactionStatus.APROVADO,
       user: userEmail
     };
@@ -101,7 +103,6 @@ export const TransferForm: React.FC<TransferFormProps> = ({ establishments, onSa
                     value={sourceId} 
                     onChange={(e) => {
                       setSourceId(e.target.value);
-                      // Se selecionar a mesma que o alvo, tenta mudar o alvo
                       if (e.target.value === targetId) {
                          const other = establishments.find(est => est.id !== e.target.value);
                          if (other) setTargetId(other.id);

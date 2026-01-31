@@ -1,17 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Establishment, Transaction, TransactionType, TransactionStatus, AppSettings } from '../types';
 import { checkAnomaly } from '../services/geminiService';
+import { CURRENCY_FORMATTER } from '../constants';
 
 interface TransactionFormProps {
   establishments: Establishment[];
+  transactions: Transaction[];
   onSave: (transaction: Transaction) => void;
   userEmail: string;
   settings: AppSettings;
 }
 
-export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments, onSave, userEmail, settings }) => {
+export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments, transactions, onSave, userEmail, settings }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -28,6 +30,26 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
   const [observations, setObservations] = useState<string>('');
   const [anomalyWarning, setAnomalyWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sourceBorrowId, setSourceBorrowId] = useState<string>('');
+
+  // Cálculo do saldo atual da unidade selecionada
+  const currentBalance = useMemo(() => {
+    return transactions
+      .filter(t => t.establishmentId === establishmentId)
+      .reduce((acc, t) => t.type === TransactionType.ENTRADA ? acc + t.amount : acc - t.amount, 0);
+  }, [transactions, establishmentId]);
+
+  const numericAmount = parseFloat(amount) || 0;
+  const isNegativeAfter = type === TransactionType.SAIDA && numericAmount > currentBalance;
+
+  // Sincroniza o estabelecimento selecionado com o parâmetro da URL ou com a lista carregada
+  useEffect(() => {
+    if (paramEstId) {
+      setEstablishmentId(paramEstId);
+    } else if (establishments.length > 0 && !establishmentId) {
+      setEstablishmentId(establishments[0].id);
+    }
+  }, [paramEstId, establishments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +85,18 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
     navigate(paramEstId ? `/establishment/${paramEstId}` : '/');
   };
 
+  const handleBorrow = () => {
+    if (!sourceBorrowId) return;
+    // Redireciona para a tela de transferência com os dados já preenchidos
+    const params = new URLSearchParams({
+      sourceId: sourceBorrowId,
+      targetId: establishmentId,
+      amount: amount,
+      description: `Cobertura de Saldo: ${description}`
+    });
+    navigate(`/transfer?${params.toString()}`);
+  };
+
   return (
     <div className="max-w-xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
@@ -82,8 +116,40 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
           <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Valor Total</label>
           <div className="relative">
              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-             <input type="number" step="0.01" inputMode="decimal" required min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full text-3xl font-black pl-12 pr-4 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white" placeholder="0.00" />
+             <input type="number" step="0.01" inputMode="decimal" required min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className={`w-full text-3xl font-black pl-12 pr-4 py-4 border rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors ${isNegativeAfter ? 'border-rose-500 ring-4 ring-rose-500/10' : 'border-slate-200 dark:border-slate-700'}`} placeholder="0.00" />
           </div>
+          {isNegativeAfter && (
+            <div className="mt-3 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl animate-fade-in">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 mb-3">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <span className="text-[10px] font-black uppercase tracking-widest">Saldo Insuficiente (Atual: {CURRENCY_FORMATTER.format(currentBalance)})</span>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">De onde quer emprestar?</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={sourceBorrowId} 
+                    onChange={(e) => setSourceBorrowId(e.target.value)} 
+                    className="flex-1 p-2.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none"
+                  >
+                    <option value="">Selecionar unidade...</option>
+                    {establishments.filter(e => e.id !== establishmentId).map(est => (
+                      <option key={est.id} value={est.id}>{est.name}</option>
+                    ))}
+                  </select>
+                  <button 
+                    type="button"
+                    onClick={handleBorrow}
+                    disabled={!sourceBorrowId}
+                    className="bg-amber-500 text-white px-4 rounded-xl text-[9px] font-black uppercase tracking-widest disabled:opacity-50 transition-all hover:bg-amber-600 shadow-sm"
+                  >
+                    Transferir
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
