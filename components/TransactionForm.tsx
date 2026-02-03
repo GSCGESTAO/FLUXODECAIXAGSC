@@ -68,6 +68,41 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
         }
     }
 
+    // Se houver uma unidade de empréstimo selecionada, processa a transferência antes
+    if (isNegativeAfter && sourceBorrowId) {
+      const sourceEst = establishments.find(e => e.id === sourceBorrowId);
+      const targetEst = establishments.find(e => e.id === establishmentId);
+
+      if (sourceEst && targetEst) {
+        // 1. Saída da unidade que empresta
+        onSave({
+          id: crypto.randomUUID(),
+          date,
+          timestamp: new Date().toISOString(),
+          establishmentId: sourceBorrowId,
+          type: TransactionType.SAIDA,
+          amount: numericAmount,
+          description: `COBERTURA AUTOMÁTICA para ${targetEst.name}: ${description}`,
+          status: TransactionStatus.APROVADO,
+          user: userEmail
+        });
+
+        // 2. Entrada na unidade que recebe
+        onSave({
+          id: crypto.randomUUID(),
+          date,
+          timestamp: new Date().toISOString(),
+          establishmentId: establishmentId,
+          type: TransactionType.ENTRADA,
+          amount: numericAmount,
+          description: `COBERTURA AUTOMÁTICA via ${sourceEst.name}: ${description}`,
+          status: TransactionStatus.APROVADO,
+          user: userEmail
+        });
+      }
+    }
+
+    // 3. Salva a transação original (a despesa ou entrada)
     const newTransaction: Transaction = {
       id: crypto.randomUUID(),
       date,
@@ -83,18 +118,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
 
     onSave(newTransaction);
     navigate(paramEstId ? `/establishment/${paramEstId}` : '/');
-  };
-
-  const handleBorrow = () => {
-    if (!sourceBorrowId) return;
-    // Redireciona para a tela de transferência com os dados já preenchidos
-    const params = new URLSearchParams({
-      sourceId: sourceBorrowId,
-      targetId: establishmentId,
-      amount: amount,
-      description: `Cobertura de Saldo: ${description}`
-    });
-    navigate(`/transfer?${params.toString()}`);
   };
 
   return (
@@ -126,27 +149,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
               </div>
               
               <div className="space-y-2">
-                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">De onde quer emprestar?</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">Deseja transferir para cobrir?</label>
                 <div className="flex gap-2">
                   <select 
                     value={sourceBorrowId} 
                     onChange={(e) => setSourceBorrowId(e.target.value)} 
-                    className="flex-1 p-2.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none"
+                    className="flex-1 p-3 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20"
                   >
-                    <option value="">Selecionar unidade...</option>
+                    <option value="">Não transferir (deixar negativo)</option>
                     {establishments.filter(e => e.id !== establishmentId).map(est => (
                       <option key={est.id} value={est.id}>{est.name}</option>
                     ))}
                   </select>
-                  <button 
-                    type="button"
-                    onClick={handleBorrow}
-                    disabled={!sourceBorrowId}
-                    className="bg-amber-500 text-white px-4 rounded-xl text-[9px] font-black uppercase tracking-widest disabled:opacity-50 transition-all hover:bg-amber-600 shadow-sm"
-                  >
-                    Transferir
-                  </button>
                 </div>
+                {sourceBorrowId && (
+                  <p className="text-[9px] text-amber-600 dark:text-amber-400 font-bold uppercase mt-1 italic">Ao confirmar, uma transferência será gerada automaticamente.</p>
+                )}
               </div>
             </div>
           )}

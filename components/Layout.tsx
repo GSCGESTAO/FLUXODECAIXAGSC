@@ -37,6 +37,20 @@ export const Layout: React.FC<LayoutProps> = ({
   const isFormPage = path === '/new' || path === '/transfer';
   const isConvidado = userRole === 'Convidado';
 
+  // Detecta se estamos em uma página de detalhes de estabelecimento para passar o contexto aos botões flutuantes
+  const estIdMatch = path.match(/^\/establishment\/([^/]+)/);
+  const currentEstId = estIdMatch ? estIdMatch[1] : null;
+
+  const handleFloatingNew = () => {
+    const url = currentEstId ? `/new?establishmentId=${currentEstId}` : '/new';
+    navigate(url);
+  };
+
+  const handleFloatingTransfer = () => {
+    const url = currentEstId ? `/transfer?sourceId=${currentEstId}` : '/transfer';
+    navigate(url);
+  };
+
   return (
     <div className={`${darkMode ? 'dark' : ''}`}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 pb-20 md:pb-0 print:bg-white print:pb-0 transition-colors duration-200">
@@ -56,7 +70,7 @@ export const Layout: React.FC<LayoutProps> = ({
               >
                 <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500' : (pendingCount > 0 ? 'bg-amber-500 animate-pulse' : (lastSync ? 'bg-emerald-500' : 'bg-slate-300'))}`}></div>
                 <div className="flex items-center gap-1.5">
-                  <svg className={`w-4 h-4 text-slate-400 group-hover:text-indigo-500 ${isSyncing ? 'animate-spin text-indigo-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  <svg className={`w-4 h-4 text-slate-400 group-hover:text-indigo-500 ${isSyncing ? 'animate-spin text-indigo-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
                   <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 hidden sm:inline uppercase tracking-tighter">{isSyncing ? 'Sync...' : (pendingCount > 0 ? `${pendingCount} P` : 'OK')}</span>
                 </div>
               </button>
@@ -101,8 +115,20 @@ export const Layout: React.FC<LayoutProps> = ({
 
         {!isFormPage && !isConvidado && (
           <div className="fixed bottom-24 md:bottom-8 right-6 flex items-center gap-3 z-40 print:hidden">
-            <button onClick={() => navigate('/transfer')} className="w-12 h-12 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center border-2 border-white dark:border-slate-800 hover:scale-110 active:scale-95 transition-all"><svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 8l4 4m0 0l-4 4m4-4H3m13-4V4m-4 16v-4"/></svg></button>
-            <button onClick={() => navigate('/new')} className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center border-2 border-white dark:border-slate-800 hover:scale-110 active:scale-95 transition-all"><svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            <button 
+              onClick={handleFloatingTransfer} 
+              title="Nova Transferência"
+              className="w-12 h-12 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center border-2 border-white dark:border-slate-800 hover:scale-110 active:scale-95 transition-all"
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 8l4 4m0 0l-4 4m4-4H3m13-4V4m-4 16v-4"/></svg>
+            </button>
+            <button 
+              onClick={handleFloatingNew} 
+              title="Novo Lançamento"
+              className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center border-2 border-white dark:border-slate-800 hover:scale-110 active:scale-95 transition-all"
+            >
+              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
           </div>
         )}
 
