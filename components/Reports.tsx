@@ -66,6 +66,11 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
     if (timeA !== timeB) return timeA - timeB;
 
+    // Tie-breaker: ENTRADA always comes BEFORE SAIDA (to prevent negative balancing)
+    if (a.type !== b.type) {
+      return a.type === TransactionType.ENTRADA ? -1 : 1;
+    }
+
     const indexA = transactions.indexOf(a);
     const indexB = transactions.indexOf(b);
     return indexB - indexA;

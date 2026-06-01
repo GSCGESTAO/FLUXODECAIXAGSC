@@ -74,11 +74,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
       const targetEst = establishments.find(e => e.id === establishmentId);
 
       if (sourceEst && targetEst) {
+        const baseTime = Date.now();
         // 1. Saída da unidade que empresta
         onSave({
           id: crypto.randomUUID(),
           date,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(baseTime).toISOString(),
           establishmentId: sourceBorrowId,
           type: TransactionType.SAIDA,
           amount: numericAmount,
@@ -91,7 +92,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
         onSave({
           id: crypto.randomUUID(),
           date,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(baseTime + 1000).toISOString(),
           establishmentId: establishmentId,
           type: TransactionType.ENTRADA,
           amount: numericAmount,
@@ -106,7 +107,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ establishments
     const newTransaction: Transaction = {
       id: crypto.randomUUID(),
       date,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(Date.now() + 2000).toISOString(),
       establishmentId,
       type,
       amount: numericAmount,
