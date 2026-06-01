@@ -113,6 +113,18 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
   }, [transactions]);
 
   // Calculations
+  const saldoAnterior = useMemo(() => {
+    return transactions
+      .filter(t => selectedEstIds.includes(t.establishmentId) && t.date < startDate)
+      .reduce((sum, t) => {
+        if (t.type === TransactionType.ENTRADA) {
+          return sum + t.amount;
+        } else {
+          return sum - t.amount;
+        }
+      }, 0);
+  }, [transactions, startDate, selectedEstIds]);
+
   const totalEntries = filteredData
     .filter(t => t.type === TransactionType.ENTRADA)
     .reduce((sum, t) => sum + t.amount, 0);
@@ -121,7 +133,7 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     .filter(t => t.type === TransactionType.SAIDA)
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const finalBalance = totalEntries - totalExits;
+  const finalBalance = saldoAnterior + totalEntries - totalExits;
 
   const handlePrint = () => {
     window.print();
@@ -272,17 +284,32 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8 border-b border-slate-200 dark:border-slate-700 pb-8">
-          <div className="text-center">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Total Entradas</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 border-b border-slate-200 dark:border-slate-700 pb-8">
+          <div className="text-center p-2">
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Saldo Anterior</div>
+            <div className={`text-lg font-bold ${saldoAnterior >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {CURRENCY_FORMATTER.format(saldoAnterior)}
+            </div>
+          </div>
+          <div className="text-center p-2 border-l border-slate-100 dark:border-slate-700">
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black flex items-center justify-center gap-1">
+              <span>Total Entradas</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">(+)</span>
+            </div>
             <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{CURRENCY_FORMATTER.format(totalEntries)}</div>
           </div>
-          <div className="text-center border-l border-slate-100 dark:border-slate-700">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Total Saídas</div>
+          <div className="text-center p-2 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-700 pt-4 lg:pt-2">
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black flex items-center justify-center gap-1">
+              <span>Total Saídas</span>
+              <span className="text-rose-600 dark:text-rose-400 font-bold">(-)</span>
+            </div>
             <div className="text-lg font-bold text-rose-600 dark:text-rose-400">{CURRENCY_FORMATTER.format(totalExits)}</div>
           </div>
-          <div className="text-center border-l border-slate-100 dark:border-slate-700">
-            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black">Saldo Final</div>
+          <div className="text-center p-2 border-t lg:border-t-0 border-l border-slate-100 dark:border-slate-700 pt-4 lg:pt-2">
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black flex items-center justify-center gap-1">
+              <span>Saldo Final</span>
+              <span className="text-slate-700 dark:text-slate-300 font-bold">(=)</span>
+            </div>
             <div className={`text-lg font-bold ${finalBalance >= 0 ? 'text-slate-800 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
               {CURRENCY_FORMATTER.format(finalBalance)}
             </div>
