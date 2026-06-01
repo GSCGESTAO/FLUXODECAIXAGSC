@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Establishment, Transaction, TransactionType, AppSettings, UserRole } from '../types';
+import { Establishment, Transaction, TransactionType, AppSettings, UserRole, parseEditHistory } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
 import { askFinancialAssistant, AiAssistantResponse } from '../services/geminiService';
 
@@ -11,9 +11,10 @@ interface EstablishmentDetailProps {
   onUpdateTransaction: (t: Transaction) => void;
   settings: AppSettings;
   userRole?: UserRole | null;
+  userEmail?: string;
 }
 
-export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establishments, transactions, onUpdateTransaction, settings, userRole }) => {
+export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establishments, transactions, onUpdateTransaction, settings, userRole, userEmail }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,9 +174,51 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                   <div className={`mt-2 w-2.5 h-2.5 rounded-full ${t.type === TransactionType.ENTRADA ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{t.description}</div>
+                      <div className="relative group/id cursor-help">
+                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm hover:text-indigo-600 transition-colors">
+                          {t.description}
+                        </div>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/id:block bg-slate-900 text-white text-[10px] font-mono px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none tracking-tight">
+                          ID: <span className="text-slate-300 select-all font-semibold">{t.id}</span>
+                        </div>
+                      </div>
                       {t.isEdited && (
-                        <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm">Editado</span>
+                        <div className="relative group/edit inline-block">
+                          <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm cursor-help">
+                            Editado
+                          </span>
+                          {/* Edit list popover */}
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/edit:block bg-slate-900 text-white text-xs p-3 rounded-xl shadow-xl w-64 z-50 pointer-events-none leading-normal font-sans border border-slate-700">
+                            <div className="font-extrabold uppercase text-[9px] tracking-wider text-amber-500 mb-1.5 flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                              Histórico de Alterações
+                            </div>
+                            {(() => {
+                              const edits = parseEditHistory(t.observations);
+                              if (edits.length === 0) {
+                                return (
+                                  <div className="text-[10px] text-slate-300 font-medium whitespace-normal">
+                                    Lançamento editado. Detalhes indisponíveis para o lançamento original.
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="space-y-2 max-h-36 overflow-y-auto pr-1 whitespace-normal text-left">
+                                  {edits.map((ed, idx) => (
+                                    <div key={idx} className="border-t border-slate-800 pt-1.5 first:border-0 first:pt-0">
+                                      <div className="text-[10px] text-slate-400 font-bold">
+                                        {ed.timestamp} por <span className="text-amber-400">{ed.user.split('@')[0]}</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-300 font-medium mt-0.5 break-words">
+                                        {ed.changes}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">
@@ -266,12 +309,46 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                     <button onClick={() => {
                         if (parseInt(captchaInput) !== (captchaChallenge.a + captchaChallenge.b)) { alert("Cálculo incorreto!"); return; }
                         if (editingTransaction) {
+                          const changes: string[] = [];
+                          const newAmount = parseFloat(editFormAmount);
+                          const newDesc = editFormDesc;
+                          const newType = editFormType;
+                          const newEstId = editFormEstId;
+
+                          if (editingTransaction.amount !== newAmount) {
+                            changes.push(`Valor: ${CURRENCY_FORMATTER.format(editingTransaction.amount)} → ${CURRENCY_FORMATTER.format(newAmount)}`);
+                          }
+                          if (editingTransaction.description !== newDesc) {
+                            changes.push(`Descr: '${editingTransaction.description}' → '${newDesc}'`);
+                          }
+                          if (editingTransaction.type !== newType) {
+                            changes.push(`Tipo: ${editingTransaction.type} → ${newType}`);
+                          }
+                          if (editingTransaction.establishmentId !== newEstId) {
+                            const oldEst = establishments.find(e => e.id === editingTransaction.establishmentId)?.name || 'Outro';
+                            const newEst = establishments.find(e => e.id === newEstId)?.name || 'Outro';
+                            changes.push(`Unid: ${oldEst} → ${newEst}`);
+                          }
+
+                          let updatedObs = editingTransaction.observations || "";
+                          if (changes.length > 0) {
+                            const timestamp = new Date().toLocaleString('pt-BR');
+                            const editor = userEmail || 'sistema';
+                            const changeSummary = `[Editado em ${timestamp} por ${editor} | Alterou: ${changes.join(', ')}]`;
+                            if (updatedObs) {
+                              updatedObs = `${updatedObs}\n${changeSummary}`;
+                            } else {
+                              updatedObs = changeSummary;
+                            }
+                          }
+
                           onUpdateTransaction({ 
                             ...editingTransaction, 
-                            amount: parseFloat(editFormAmount), 
-                            description: editFormDesc, 
-                            type: editFormType,
-                            establishmentId: editFormEstId,
+                            amount: newAmount, 
+                            description: newDesc, 
+                            type: newType,
+                            establishmentId: newEstId,
+                            observations: updatedObs,
                             isEdited: true 
                           });
                         }

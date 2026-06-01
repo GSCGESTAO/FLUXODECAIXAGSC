@@ -73,6 +73,7 @@ function doPost(e) {
           sheet.getRange(i + 1, 5).setValue(payload.type);
           sheet.getRange(i + 1, 6).setValue(payload.amount);
           sheet.getRange(i + 1, 7).setValue(payload.description);
+          sheet.getRange(i + 1, 8).setValue(payload.observations || "");
           sheet.getRange(i + 1, 11).setValue(true); // isEdited vira true
           break;
         }

@@ -61,3 +61,26 @@ export interface AnomalyCheckResult {
   isAnomalous: boolean;
   reason: string;
 }
+
+export interface EditLog {
+  timestamp: string;
+  user: string;
+  changes: string;
+}
+
+export const parseEditHistory = (observations?: string): EditLog[] => {
+  if (!observations) return [];
+  // Match both formats with/without "Alterou: "
+  const regex = /\[Editado em ([^\]]+) por ([^|\]]+)(?:\| ?Alterou:? ?([^\]]*))?\]/g;
+  const logs: EditLog[] = [];
+  let match;
+  while ((match = regex.exec(observations)) !== null) {
+    logs.push({
+      timestamp: match[1]?.trim() || '',
+      user: match[2]?.trim() || '',
+      changes: match[3]?.trim() || 'Lançamento atualizado'
+    });
+  }
+  return logs;
+};
+

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { Establishment, Transaction, TransactionType } from '../types';
+import { Establishment, Transaction, TransactionType, parseEditHistory } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
 
 interface ReportsProps {
@@ -345,7 +345,54 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       {establishments.find(e => e.id === t.establishmentId)?.name}
                     </td>
-                    <td className="px-4 py-3 text-slate-800 dark:text-slate-200 font-bold">{t.description}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-200 font-bold relative group/rep-id">
+                      <div className="flex items-center gap-2">
+                        <span className="hover:text-indigo-600 transition-colors cursor-help">{t.description}</span>
+                        {t.isEdited && (
+                          <div className="relative group/rep-edit inline-block">
+                            <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm cursor-help">
+                              Editado
+                            </span>
+                            {/* Edit list popover */}
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/rep-edit:block bg-slate-900 text-white text-xs p-3 rounded-xl shadow-xl w-64 z-50 pointer-events-none leading-normal font-sans border border-slate-700 font-normal">
+                              <div className="font-extrabold uppercase text-[9px] tracking-wider text-amber-500 mb-1.5 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                Histórico de Alterações
+                              </div>
+                              {(() => {
+                                const edits = parseEditHistory(t.observations);
+                                if (edits.length === 0) {
+                                  return (
+                                    <div className="text-[10px] text-slate-300 font-medium">
+                                      Lançamento editado. Detalhes indisponíveis para o lançamento original.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                                    {edits.map((ed, idx) => (
+                                      <div key={idx} className="border-t border-slate-800 pt-1.5 first:border-0 first:pt-0">
+                                        <div className="text-[10px] text-slate-400 font-bold">
+                                          {ed.timestamp} por <span className="text-amber-400">{ed.user.split('@')[0]}</span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-300 font-medium mt-0.5 break-words">
+                                          {ed.changes}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Tooltip on hovering description for ID */}
+                      <div className="absolute left-4 bottom-full mb-2 hidden group-hover/rep-id:block bg-slate-900 text-white text-[10px] font-mono px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none tracking-tight font-normal">
+                        ID: <span className="text-slate-300 select-all font-semibold">{t.id}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
                         t.type === TransactionType.ENTRADA 
