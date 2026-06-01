@@ -44,8 +44,10 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents);
     const action = payload.action;
     const user = payload.user || "Unknown";
+    let logDetails = "OK";
 
     if (action === 'ADD_TRANSACTION') {
+      logDetails = "ID: " + payload.id + " | Unidade: " + payload.establishmentId + " | Valor: " + payload.amount;
       ss.getSheetByName("Transacoes").appendRow([
         payload.id, 
         payload.date, 
@@ -61,6 +63,7 @@ function doPost(e) {
       ]);
     } 
     else if (action === 'EDIT_TRANSACTION') {
+      logDetails = "ID: " + payload.id + " | Nova Unidade: " + payload.establishmentId + " | Novo Valor: " + payload.amount;
       const sheet = ss.getSheetByName("Transacoes");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
@@ -76,6 +79,7 @@ function doPost(e) {
       }
     }
     else if (action === 'EDIT_ESTABLISHMENT') {
+      logDetails = "ID: " + payload.id + " | Nome: " + payload.name;
       const sheet = ss.getSheetByName("Estabelecimentos");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
@@ -86,12 +90,15 @@ function doPost(e) {
       }
     }
     else if (action === 'ADD_ESTABLISHMENT') {
+      logDetails = "ID: " + payload.id + " | Nome: " + payload.name;
       ss.getSheetByName("Estabelecimentos").appendRow([payload.id, payload.name, payload.responsibleEmail]);
     }
     else if (action === 'ADD_USER') {
+      logDetails = "User: " + payload.email + " | Role: " + payload.role;
       ss.getSheetByName("Usuarios").appendRow([Utilities.getUuid(), payload.email.toLowerCase().trim(), payload.role]);
     }
     else if (action === 'EDIT_USER') {
+      logDetails = "User: " + payload.email + " | Role: " + payload.role;
       const sheet = ss.getSheetByName("Usuarios");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
@@ -102,6 +109,7 @@ function doPost(e) {
       }
     }
     else if (action === 'DELETE_USER') {
+      logDetails = "User: " + payload.id;
       const sheet = ss.getSheetByName("Usuarios");
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
@@ -112,10 +120,12 @@ function doPost(e) {
       }
     }
     else if (action === 'UPDATE_SETTINGS') {
+      logDetails = "Configurações atualizadas";
       const sheet = ss.getSheetByName("Configuracoes") || ss.insertSheet("Configuracoes");
       sheet.getRange("A2").setValue(JSON.stringify(payload.settings));
     }
     else if (action === 'UPDATE_NOTE') {
+      logDetails = "Entity: " + payload.entityId;
       const sheet = ss.getSheetByName("Anotacoes") || ss.insertSheet("Anotacoes");
       const data = sheet.getDataRange().getValues();
       let found = false;
@@ -123,7 +133,7 @@ function doPost(e) {
       if (!found) sheet.appendRow([payload.entityId || "GENERAL", payload.notes]);
     }
 
-    logActivity(ss, user, action, "OK");
+    logActivity(ss, user, action, logDetails);
     return ContentService.createTextOutput(JSON.stringify({ "status": "success" })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": err.toString() })).setMimeType(ContentService.MimeType.JSON);

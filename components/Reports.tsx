@@ -67,6 +67,38 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, startDate, endDate, selectedEstIds]);
 
+  const computedBalances = useMemo(() => {
+    const map: Record<string, { previous: number; newBalance: number }> = {};
+    const estIds = Array.from(new Set(transactions.map(t => t.establishmentId)));
+    
+    for (const estId of estIds) {
+      const sorted = transactions
+        .filter(t => t.establishmentId === estId)
+        .sort((a, b) => {
+          const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+          if (dateDiff !== 0) return dateDiff;
+          const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          if (timeDiff !== 0) return timeDiff;
+          return a.id.localeCompare(b.id);
+        });
+
+      let current = 0;
+      for (const t of sorted) {
+        const prev = current;
+        if (t.type === TransactionType.ENTRADA) {
+          current += t.amount;
+        } else {
+          current -= t.amount;
+        }
+        map[t.id] = {
+          previous: prev,
+          newBalance: current
+        };
+      }
+    }
+    return map;
+  }, [transactions]);
+
   // Calculations
   const totalEntries = filteredData
     .filter(t => t.type === TransactionType.ENTRADA)
@@ -252,13 +284,15 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
                 <th className="px-4 py-3">Unidade</th>
                 <th className="px-4 py-3">Descrição</th>
                 <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3 rounded-r-lg text-right">Valor</th>
+                <th className="px-4 py-3 text-right">Saldo Anterior</th>
+                <th className="px-4 py-3 text-right">Valor</th>
+                <th className="px-4 py-3 rounded-r-lg text-right">Saldo Após</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     Nenhuma transação encontrada.
                   </td>
                 </tr>
@@ -281,10 +315,18 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
                         {t.type}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right text-slate-500 font-semibold">
+                      {computedBalances[t.id] ? CURRENCY_FORMATTER.format(computedBalances[t.id].previous) : '-'}
+                    </td>
                     <td className={`px-4 py-3 text-right font-black ${
                       t.type === TransactionType.ENTRADA ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                     }`}>
                       {CURRENCY_FORMATTER.format(t.amount)}
+                    </td>
+                    <td className={`px-4 py-3 text-right font-black ${
+                      computedBalances[t.id]?.newBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                    }`}>
+                      {computedBalances[t.id] ? CURRENCY_FORMATTER.format(computedBalances[t.id].newBalance) : '-'}
                     </td>
                   </tr>
                 ))

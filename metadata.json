@@ -1,5 +1,6 @@
 {
   "name": "Fluxo de Caixa GSC Cloud",
   "description": "Sistema inteligente de gestão financeira multi-unidade otimizado para nuvem e insights de IA.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

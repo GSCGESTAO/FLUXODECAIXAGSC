@@ -41,6 +41,35 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [transactions, id]);
 
+  const computedBalances = useMemo(() => {
+    const map: Record<string, { previous: number; newBalance: number }> = {};
+    // Sort oldest first for chronological running balance
+    const sorted = [...transactions]
+      .filter(t => t.establishmentId === id)
+      .sort((a, b) => {
+        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return a.id.localeCompare(b.id);
+      });
+
+    let current = 0;
+    for (const t of sorted) {
+      const prev = current;
+      if (t.type === TransactionType.ENTRADA) {
+        current += t.amount;
+      } else {
+        current -= t.amount;
+      }
+      map[t.id] = {
+        previous: prev,
+        newBalance: current
+      };
+    }
+    return map;
+  }, [transactions, id]);
+
   const balance = useMemo(() => estTransactions.reduce((acc, t) => t.type === TransactionType.ENTRADA ? acc + t.amount : acc - t.amount, 0), [estTransactions]);
 
   const editingTransaction = useMemo(() => transactions.find(t => t.id === editId), [transactions, editId]);
@@ -142,11 +171,18 @@ export const EstablishmentDetail: React.FC<EstablishmentDetailProps> = ({ establ
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className={`font-black text-sm tracking-tighter ${t.type === TransactionType.ENTRADA ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.type === TransactionType.ENTRADA ? '+' : '-'} {CURRENCY_FORMATTER.format(t.amount)}
+                    <div className="text-right">
+                      <div className={`font-black text-sm tracking-tighter ${t.type === TransactionType.ENTRADA ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {t.type === TransactionType.ENTRADA ? '+' : '-'} {CURRENCY_FORMATTER.format(t.amount)}
+                      </div>
+                      {computedBalances[t.id] && (
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                          Saldo: <span className="font-semibold text-slate-500 dark:text-slate-400">{CURRENCY_FORMATTER.format(computedBalances[t.id].previous)}</span> → <span className={`font-bold ${computedBalances[t.id].newBalance >= 0 ? 'text-emerald-600/80 dark:text-emerald-400/80' : 'text-rose-600/80 dark:text-rose-400/80'}`}>{CURRENCY_FORMATTER.format(computedBalances[t.id].newBalance)}</span>
+                        </div>
+                      )}
                     </div>
                     {(isAdmin || isFinanceiro) && (
-                      <button onClick={() => startEdit(t)} className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => startEdit(t)} className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all font-bold">
                         <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       </button>
                     )}
