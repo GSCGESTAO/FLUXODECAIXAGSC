@@ -57,6 +57,20 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     return isoStr;
   };
 
+  const compareChronological = (a: Transaction, b: Transaction) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    if (dateA !== dateB) return dateA - dateB;
+
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    if (timeA !== timeB) return timeA - timeB;
+
+    const indexA = transactions.indexOf(a);
+    const indexB = transactions.indexOf(b);
+    return indexB - indexA;
+  };
+
   // Filter Logic
   const filteredData = useMemo(() => {
     return transactions.filter(t => {
@@ -64,7 +78,7 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
       const isDateInRange = tDate >= startDate && tDate <= endDate;
       const isEstMatch = selectedEstIds.includes(t.establishmentId);
       return isDateInRange && isEstMatch;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => compareChronological(b, a));
   }, [transactions, startDate, endDate, selectedEstIds]);
 
   const computedBalances = useMemo(() => {
@@ -74,13 +88,7 @@ export const Reports: React.FC<ReportsProps> = ({ establishments, transactions }
     for (const estId of estIds) {
       const sorted = transactions
         .filter(t => t.establishmentId === estId)
-        .sort((a, b) => {
-          const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-          if (dateDiff !== 0) return dateDiff;
-          const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-          if (timeDiff !== 0) return timeDiff;
-          return a.id.localeCompare(b.id);
-        });
+        .sort(compareChronological);
 
       let current = 0;
       for (const t of sorted) {
